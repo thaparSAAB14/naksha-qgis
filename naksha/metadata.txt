@@ -1,0 +1,17 @@
+[general]
+name=Naksha
+qgisMinimumVersion=3.40
+description=Free, open-source AI agent for QGIS — state a goal in plain language and Naksha does the GIS work.
+about=Naksha (नक्शा, "map") adds a dockable AI chat pane to QGIS. It inspects your project, runs
+    Processing algorithms, and verifies its own outputs. Works with local Ollama (free, offline —
+    nothing leaves your machine) or any OpenAI-compatible or Anthropic API. GPLv2+.
+version=0.1.0
+author=Naksha contributors
+email=connect@priyanshu.world
+experimental=True
+icon=icon.png
+tags=ai,agent,chat,llm,automation,processing,assistant
+category=Plugins
+homepage=https://github.com/thaparSAAB14/naksha-qgis
+tracker=https://github.com/thaparSAAB14/naksha-qgis/issues
+repository=https://github.com/thaparSAAB14/naksha-qgis
