@@ -4,9 +4,10 @@
 a dockable chat pane where you state a goal in plain language and Naksha inspects the
 project, runs the work, and reports back with real numbers.
 
-**Status: v0.2.0, experimental.** The agent discovers and runs any of the ~1000 installed
-Processing algorithms (introspected live from the registry — third-party providers
-included), **verifies its own outputs** (a 0-feature "success" gets flagged and fixed,
+**Status: v0.2.0, experimental.** The agent discovers and runs any Processing algorithm you
+have installed — introspected live from the registry, so GRASS, GDAL, PDAL and third-party
+plugin algorithms all come for free (715 on the developer's machine; your count depends on
+your providers). It **verifies its own outputs** (a 0-feature "success" gets flagged and fixed,
 not reported), and runs threaded with native cancel. Three approval modes: *Ask before
 writing* (default), *Autonomous*, *Read-only*. Providers: any OpenAI-compatible endpoint
 (local [Ollama](https://ollama.com) by default — free, offline), or bring your existing
