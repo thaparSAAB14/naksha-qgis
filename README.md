@@ -33,17 +33,28 @@ Defaults target local Ollama (`http://localhost:11434/v1`, model `qwen2.5:7b`):
 ollama pull qwen2.5:7b
 ```
 
-To change provider/model, in the QGIS Python console:
+To use a hosted provider instead, open the QGIS Python console (**Plugins → Python Console**).
+
+> **Paste one line at a time.** The console's `>>>` prompt compiles a single statement, so
+> pasting a multi-line block fails with `SyntaxError: multiple statements found`. The lines
+> below are each self-contained — semicolons keep them to one statement apiece.
+
+Line 1, the endpoint and model (this example is Groq):
 
 ```python
-from qgis.core import QgsSettings, QgsApplication
-QgsSettings().setValue("naksha/base_url", "https://api.groq.com/openai/v1")
-QgsSettings().setValue("naksha/model", "llama-3.3-70b-versatile")
-QgsApplication.authManager().storeAuthSetting("naksha/api_key", "sk-…", True)  # encrypted
+from qgis.core import QgsSettings; QgsSettings().setValue("naksha/base_url", "https://api.groq.com/openai/v1"); QgsSettings().setValue("naksha/model", "llama-3.3-70b-versatile")
 ```
 
-A settings dialog is planned; the API key lives in QGIS's encrypted auth store, never a
-plain file.
+Line 2, your API key — replace the placeholder with your real key before running it:
+
+```python
+from qgis.core import QgsApplication; QgsApplication.authManager().storeAuthSetting("naksha/api_key", "PASTE_YOUR_KEY_HERE", True)
+```
+
+The key goes into QGIS's encrypted auth store, never a plain file. A settings dialog is
+planned. If nothing is configured, Naksha targets local Ollama — and if Ollama isn't
+running you'll see `Error: Connection refused`, which means "no provider reachable", not
+a bug in the plugin.
 
 ## Use the AI subscription you already pay for
 
