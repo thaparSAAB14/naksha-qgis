@@ -4,9 +4,13 @@
 a dockable chat pane where you state a goal in plain language and Naksha inspects the
 project, runs the work, and reports back with real numbers.
 
-**Status: early development (v0.1.0, walking skeleton).** One tool (`project_state`),
-one provider family (any OpenAI-compatible endpoint, local [Ollama](https://ollama.com)
-by default — free, offline, nothing leaves your machine).
+**Status: v0.2.0, experimental.** The agent discovers and runs any of the ~1000 installed
+Processing algorithms (introspected live from the registry — third-party providers
+included), **verifies its own outputs** (a 0-feature "success" gets flagged and fixed,
+not reported), and runs threaded with native cancel. Three approval modes: *Ask before
+writing* (default), *Autonomous*, *Read-only*. Providers: any OpenAI-compatible endpoint
+(local [Ollama](https://ollama.com) by default — free, offline), or bring your existing
+AI subscription via the MCP bridge below. See [docs/PRIVACY.md](docs/PRIVACY.md).
 
 ## Install (development)
 

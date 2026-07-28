@@ -240,13 +240,36 @@ def openai_tool_specs():
     ]
 
 
+# self-heal seeds: translate common failures into a plain-language next move
+_HINTS = (
+    ("crs", "the layers are probably in different CRSs — reproject with native:reprojectlayer first"),
+    ("projection", "the layers are probably in different CRSs — reproject with native:reprojectlayer first"),
+    ("geometry", "run native:fixgeometries on the input, then retry"),
+    ("lock", "the file is locked by another program — write to a new output path"),
+    ("in use", "the file is locked by another program — write to a new output path"),
+    ("field", "check the real field names via project_state before retrying"),
+    ("permission", "no write access there — use a different folder or TEMPORARY_OUTPUT"),
+)
+
+
+def _hint(err):
+    low = str(err).lower()
+    for needle, hint in _HINTS:
+        if needle in low:
+            return f"  Hint: {hint}"
+    return ""
+
+
+READ_ONLY = {"project_state", "search_algorithms", "describe_algorithm", "query_features"}
+
+
 def run_tool(name, args):
     if name not in TOOLS:
         return f"error: unknown tool '{name}'"
     try:
         return str(TOOLS[name]["func"](**args))
     except Exception as e:  # result goes back to the model, which can react
-        return f"error: {e}"
+        return f"error: {e}{_hint(e)}"
 
 
 from . import introspect  # noqa: E402  (no cycle: introspect never imports tools)

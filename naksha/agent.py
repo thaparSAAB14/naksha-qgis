@@ -1,4 +1,6 @@
-"""The agent turn: bounded tool-call loop. Plan/verify/self-heal lands in M3."""
+"""The agent turn: bounded tool-call loop with ambient context, an approval
+gate, and cooperative cancellation. Runs on a worker thread via task.py —
+everything touching QGIS goes through `main`."""
 
 import json
 
@@ -8,26 +10,41 @@ SYSTEM = (
     "You are Naksha, an AI agent living inside QGIS. Use your tools to inspect and "
     "operate on the user's open project. For GIS operations discover at runtime: "
     "search_algorithms -> describe_algorithm -> run_algorithm (outputs become "
-    "temporary layers unless a path is given). After any operation that produces "
-    "data, verify it: a 0-feature output or lost CRS means something went wrong — "
-    "say so and fix it. Be concise. Report real numbers (feature counts, CRS "
-    "codes), never a bare 'done'."
+    "temporary layers unless a path is given). For a multi-step goal, state a brief "
+    "numbered plan first, then execute it step by step. After any operation that "
+    "produces data, verify it: a 0-feature output, an empty extent, or a lost CRS "
+    "means something went wrong — diagnose, fix, and say what you corrected and why. "
+    "Be concise. Report real numbers (feature counts, CRS codes), never a bare 'done'."
 )
 
-MAX_STEPS = 10  # ponytail: flat step cap; per-step retry budget arrives with self-heal in M3
+MAX_STEPS = 25
 
 
-def run_turn(history, on_event=lambda kind, text: None):
-    """Run one user turn. `history` is the chat so far (no system message), mutated
-    in place so tool exchanges persist as context. Returns the final assistant text."""
-    msgs = [{"role": "system", "content": SYSTEM}] + history
+def run_turn(history, on_event=lambda kind, text: None, main=None, cancelled=None, gate=None):
+    """Run one user turn. `history` is the chat so far (no system messages),
+    mutated in place so tool exchanges persist as context.
+
+    main(fn)          -> run fn on the Qt main thread (default: call directly)
+    cancelled()       -> True aborts between steps
+    gate(name, args)  -> error string to block a tool call, or None to allow
+    """
+    main = main or (lambda fn: fn())
+    cancelled = cancelled or (lambda: False)
+    context = {"role": "system", "content": "Current project state:\n" + main(tools.project_state)}
+    msgs = [{"role": "system", "content": SYSTEM}, context] + history
+
+    def finish(text):
+        history[:] = msgs[2:]
+        return text
+
     for _ in range(MAX_STEPS):
+        if cancelled():
+            return finish("(cancelled)")
         msg = provider.chat(msgs, tools.openai_tool_specs())
         msgs.append(msg)
         calls = msg.get("tool_calls") or []
         if not calls:
-            history[:] = msgs[1:]
-            return msg.get("content") or ""
+            return finish(msg.get("content") or "")
         for call in calls:
             name = call["function"]["name"]
             try:
@@ -35,7 +52,6 @@ def run_turn(history, on_event=lambda kind, text: None):
             except ValueError:
                 args = {}
             on_event("tool", name)
-            result = tools.run_tool(name, args)
+            result = (gate(name, args) if gate else None) or main(lambda: tools.run_tool(name, args))
             msgs.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": result})
-    history[:] = msgs[1:]
-    return "(stopped: reached the step limit)"
+    return finish("(stopped: reached the step limit)")

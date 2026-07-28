@@ -58,7 +58,8 @@ def run_algorithm(algorithm_id="", parameters=None, **_):
         return f"error: no algorithm '{algorithm_id}' — try search_algorithms"
     params = dict(parameters or {})
     for p in _params(alg):
-        if p.type() in _SINKS and p.name() not in params:
+        required = not (p.flags() & QgsProcessingParameterDefinition.FlagOptional)
+        if p.type() in _SINKS and p.name() not in params and required:
             params[p.name()] = "TEMPORARY_OUTPUT"
     result = processing.run(algorithm_id, params)
 
@@ -69,8 +70,10 @@ def run_algorithm(algorithm_id="", parameters=None, **_):
             val.setName(f"{short}_{key.lower()}")
             QgsProject.instance().addMapLayer(val)
             if hasattr(val, "featureCount"):
+                n = val.featureCount()
+                warn = "  WARNING: 0 features — verify inputs (CRS mismatch? wrong filter?)" if n == 0 else ""
                 out.append(f"  {key}: layer '{val.name()}' added — "
-                           f"{val.featureCount()} features, CRS {val.crs().authid()}")
+                           f"{n} features, CRS {val.crs().authid()}{warn}")
             else:
                 out.append(f"  {key}: layer '{val.name()}' added — CRS {val.crs().authid()}")
         else:

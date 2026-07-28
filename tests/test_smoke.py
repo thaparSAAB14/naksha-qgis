@@ -160,5 +160,75 @@ assert results["bad_token"] == 403, results["bad_token"]
 srv.stop()
 assert not bridge.DISCOVERY.exists()  # token file cleaned up
 
+# --- M3: the trust loop ---
+from naksha.task import MainThreadBridge  # noqa: E402
+
+# 10) MainThreadBridge: cross-thread call runs on main thread, exceptions propagate
+mtb = MainThreadBridge()
+out = {}
+
+
+def worker():
+    out["value"] = mtb.call(lambda: tools.project_state()[:7])
+    try:
+        mtb.call(lambda: 1 / 0)
+        out["exc"] = "not raised"
+    except ZeroDivisionError:
+        out["exc"] = "raised"
+
+
+t2 = threading.Thread(target=worker, daemon=True)
+t2.start()
+deadline = time.time() + 15
+while t2.is_alive() and time.time() < deadline:
+    app.processEvents()
+    time.sleep(0.005)
+assert not t2.is_alive(), "bridge call timed out"
+assert out["value"] == "project" and out["exc"] == "raised", out
+
+# 11) ambient context is injected; a declined gate reaches the model verbatim
+gate_calls = []
+
+
+def fake_chat_gate(messages, tool_specs):
+    gate_calls.append(1)
+    if len(gate_calls) == 1:
+        assert messages[1]["role"] == "system", messages[1]
+        assert messages[1]["content"].startswith("Current project state:")
+        assert "test_points" in messages[1]["content"]
+        return {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {"id": "g1", "type": "function", "function": {"name": "save_project", "arguments": "{}"}}
+            ],
+        }
+    assert "declined" in messages[-1]["content"], messages[-1]
+    return {"role": "assistant", "content": "understood, not saving"}
+
+
+provider.chat = fake_chat_gate
+reply = agent.run_turn(
+    [{"role": "user", "content": "save my project"}],
+    gate=lambda n, a: None if n in tools.READ_ONLY else "error: the user declined this action",
+)
+assert reply == "understood, not saving", reply
+
+# 12) cancellation aborts before any provider call
+provider.chat = lambda m, t: (_ for _ in ()).throw(AssertionError("provider called despite cancel"))
+assert agent.run_turn([{"role": "user", "content": "x"}], cancelled=lambda: True) == "(cancelled)"
+
+# 13) healing: a CRS failure comes back with a plain-language next move
+healed = tools.run_tool("run_python", {"code": "raise ValueError('CRS mismatch between layers')"})
+assert "Hint" in healed and "reproject" in healed, healed
+
+# 14) verify signal: a 0-feature output is flagged, not reported as success
+empty = tools.run_tool(
+    "run_algorithm",
+    {"algorithm_id": "native:extractbyexpression",
+     "parameters": {"INPUT": "test_points", "EXPRESSION": "name = 'zzz'"}},
+)
+assert "WARNING: 0 features" in empty, empty
+
 app.exitQgis()
 print("smoke: all green")
