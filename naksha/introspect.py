@@ -21,15 +21,20 @@ def _params(alg):
 
 
 def search_algorithms(query="", **_):
+    """Rank by how many query terms match, so a natural phrase still finds things.
+    Requiring every term (the obvious implementation) makes 'valid geometry check'
+    miss qgis:checkvalidity, which is exactly how a model phrases a search."""
     terms = query.lower().split()
     hits = []
     for alg in QgsApplication.processingRegistry().algorithms():
         hay = f"{alg.id()} {alg.displayName()} {' '.join(alg.tags())}".lower()
-        if all(t in hay for t in terms):
-            hits.append(f"{alg.id()} — {alg.displayName()}")
+        score = sum(t in hay for t in terms)
+        if score:
+            hits.append((-score, alg.id(), f"{alg.id()} — {alg.displayName()}"))
     if not hits:
         return f"no algorithms match '{query}'"
-    shown = hits[:30]
+    hits.sort()
+    shown = [h[2] for h in hits[:30]]
     more = f"\n… and {len(hits) - 30} more; refine the query" if len(hits) > 30 else ""
     return "\n".join(shown) + more
 
@@ -83,8 +88,8 @@ def run_algorithm(algorithm_id="", parameters=None, **_):
 
 TOOLS = {
     "search_algorithms": {
-        "description": "Search the ~1000 installed Processing algorithms by keyword. "
-        "Returns matching 'id — name' lines. Always the first step before running one.",
+        "description": "Search every installed Processing algorithm by keyword, best matches "
+        "first. Returns 'id — name' lines. Always the first step before running one.",
         "parameters": {
             "type": "object",
             "properties": {"query": {"type": "string", "description": "keywords, e.g. 'buffer' or 'clip raster'"}},

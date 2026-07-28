@@ -87,6 +87,10 @@ Processing.initialize()
 # 6) catalogue: search finds native:buffer, describe exposes its real parameters
 found = tools.run_tool("search_algorithms", {"query": "buffer"})
 assert "native:buffer" in found, found
+# a natural phrase must still find the tool: not every term will match
+phrase = tools.run_tool("search_algorithms", {"query": "valid geometry check"})
+assert "qgis:checkvalidity" in phrase, phrase
+assert tools.run_tool("search_algorithms", {"query": "zzzznope"}).startswith("no algorithms")
 desc = tools.run_tool("describe_algorithm", {"algorithm_id": "native:buffer"})
 for param in ("INPUT", "DISTANCE", "OUTPUT"):
     assert param in desc, desc
@@ -159,6 +163,15 @@ assert "test_points" in results["call"]["result"], results["call"]
 assert results["bad_token"] == 403, results["bad_token"]
 srv.stop()
 assert not bridge.DISCOVERY.exists()  # token file cleaned up
+
+# a second instance's discovery file must survive the first one's shutdown
+first = bridge.BridgeServer()
+second = bridge.BridgeServer()  # replaces the discovery file with its own
+first.stop()  # must NOT delete the file it no longer owns
+assert bridge.DISCOVERY.exists(), "stale shutdown deleted the live instance's file"
+assert json.loads(bridge.DISCOVERY.read_text())["token"] == second.token
+second.stop()
+assert not bridge.DISCOVERY.exists()
 
 # --- M3: the trust loop ---
 from naksha.task import MainThreadBridge  # noqa: E402

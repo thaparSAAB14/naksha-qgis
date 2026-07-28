@@ -35,9 +35,12 @@ class BridgeServer(QObject):
 
     def stop(self):
         self.server.close()
+        # Only remove the discovery file if it is still ours: a second QGIS
+        # instance may have replaced it, and its bridge is still listening.
         try:
-            DISCOVERY.unlink()
-        except OSError:
+            if json.loads(DISCOVERY.read_text()).get("token") == self.token:
+                DISCOVERY.unlink()
+        except (OSError, ValueError):
             pass
 
     def _accept(self):
