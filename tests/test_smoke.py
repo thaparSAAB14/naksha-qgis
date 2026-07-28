@@ -78,5 +78,38 @@ assert tools.run_tool("nope", {}).startswith("error:")
 # 5) plugin module imports cleanly (instantiation needs the real GUI)
 import naksha.plugin  # noqa: E402, F401
 
+# --- M2: the introspected tool engine ---
+sys.path.append(r"C:\Program Files\QGIS 3.40.13\apps\qgis-ltr\python\plugins")
+from processing.core.Processing import Processing  # noqa: E402
+
+Processing.initialize()
+
+# 6) catalogue: search finds native:buffer, describe exposes its real parameters
+found = tools.run_tool("search_algorithms", {"query": "buffer"})
+assert "native:buffer" in found, found
+desc = tools.run_tool("describe_algorithm", {"algorithm_id": "native:buffer"})
+for param in ("INPUT", "DISTANCE", "OUTPUT"):
+    assert param in desc, desc
+
+# 7) run a REAL buffer on the memory layer; output auto-added with a real count
+before = len(QgsProject.instance().mapLayers())
+result = tools.run_tool(
+    "run_algorithm",
+    {"algorithm_id": "native:buffer", "parameters": {"INPUT": "test_points", "DISTANCE": 0.1}},
+)
+assert "1 features" in result, result
+assert "EPSG:4326" in result, result
+assert len(QgsProject.instance().mapLayers()) == before + 1
+
+# 8) project tools: query, style, layer resolution errors
+q = tools.run_tool("query_features", {"layer_name": "test_points", "expression": "name = 'a'"})
+assert q.startswith("1 features match"), q
+assert "styled" in tools.run_tool("style_layer", {"layer_name": "test_points", "mode": "single", "color": "red"})
+missing = tools.run_tool("query_features", {"layer_name": "ghost", "expression": "1"})
+assert "no layer named 'ghost'" in missing and "test_points" in missing, missing
+
+# 9) escape hatch
+assert tools.run_tool("run_python", {"code": "result = 21 * 2"}) == "42"
+
 app.exitQgis()
 print("smoke: all green")
