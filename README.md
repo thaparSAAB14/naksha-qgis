@@ -40,6 +40,33 @@ QgsApplication.authManager().storeAuthSetting("naksha/api_key", "sk-…", True) 
 A settings dialog is planned; the API key lives in QGIS's encrypted auth store, never a
 plain file.
 
+## Use the AI subscription you already pay for
+
+No API key needed: if you already pay for an AI assistant (Claude, ChatGPT, Gemini —
+or use an agentic IDE), its desktop/CLI app is an **MCP client**, and Naksha ships an MCP
+bridge that lets it drive your live QGIS session. Your subscription does the thinking;
+QGIS updates in front of you.
+
+1. In QGIS: **Plugins → Naksha → AI Bridge** (one click, remembered).
+2. Register the proxy with your AI app (needs [uv](https://docs.astral.sh/uv/); examples):
+
+   ```bash
+   claude mcp add naksha -- uv run C:\path\to\Naksha\naksha_mcp.py
+   ```
+
+   Claude Desktop / other MCP apps — add to their MCP config:
+
+   ```json
+   {"mcpServers": {"naksha": {"command": "uv", "args": ["run", "C:\\path\\to\\Naksha\\naksha_mcp.py"]}}}
+   ```
+
+3. Ask your assistant: *"what's in my QGIS project?"* — it discovers every Naksha tool
+   (search/describe/run any of the ~1000 Processing algorithms included).
+
+The bridge is localhost-only with a per-session token, off by default, and every call is
+logged to the "Naksha" log tab. Note: assistants without an MCP client app (e.g. an
+X Premium plan) can't be bridged — use their API with the built-in provider instead.
+
 ## Design rules
 
 1. **No pip dependencies** — stdlib + `qgis` + `qgis.PyQt` only. Users can't install

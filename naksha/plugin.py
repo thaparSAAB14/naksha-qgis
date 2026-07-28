@@ -3,7 +3,7 @@
 import html
 import os
 
-from qgis.core import Qgis, QgsMessageLog
+from qgis.core import Qgis, QgsMessageLog, QgsSettings
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import (
@@ -17,7 +17,7 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
-from . import agent
+from . import agent, bridge
 
 
 def log(text, level=Qgis.Info):
@@ -29,6 +29,8 @@ class NakshaPlugin:
         self.iface = iface
         self.action = None
         self.dock = None
+        self.bridge_action = None
+        self.bridge = None
 
     def initGui(self):
         icon = QIcon(os.path.join(os.path.dirname(__file__), "icon.png"))
@@ -38,13 +40,43 @@ class NakshaPlugin:
         self.iface.addToolBarIcon(self.action)
         self.iface.addPluginToMenu("&Naksha", self.action)
 
+        self.bridge_action = QAction("AI Bridge (use your AI subscription apps)", self.iface.mainWindow())
+        self.bridge_action.setCheckable(True)
+        self.bridge_action.triggered.connect(self._toggle_bridge)
+        self.iface.addPluginToMenu("&Naksha", self.bridge_action)
+        if QgsSettings().value("naksha/bridge_enabled", False, type=bool):
+            self.bridge_action.setChecked(True)
+            self._toggle_bridge(True)
+
     def unload(self):
         self.iface.removeToolBarIcon(self.action)
         self.iface.removePluginMenu("&Naksha", self.action)
+        self.iface.removePluginMenu("&Naksha", self.bridge_action)
+        if self.bridge is not None:
+            self.bridge.stop()
+            self.bridge = None
         if self.dock is not None:
             self.iface.removeDockWidget(self.dock)
             self.dock = None
         self.action = None
+
+    def _toggle_bridge(self, on):
+        QgsSettings().setValue("naksha/bridge_enabled", bool(on))
+        if on and self.bridge is None:
+            try:
+                self.bridge = bridge.BridgeServer()
+            except RuntimeError as e:
+                log(str(e), Qgis.Critical)
+                self.bridge_action.setChecked(False)
+                return
+            log(f"AI bridge listening on 127.0.0.1:{self.bridge.port()}")
+            self.iface.messageBar().pushInfo(
+                "Naksha", "AI bridge on — subscription apps can connect via naksha_mcp.py"
+            )
+        elif not on and self.bridge is not None:
+            self.bridge.stop()
+            self.bridge = None
+            log("AI bridge stopped")
 
     def _toggle(self, checked):
         if self.dock is None:

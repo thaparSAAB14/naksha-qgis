@@ -111,5 +111,54 @@ assert "no layer named 'ghost'" in missing and "test_points" in missing, missing
 # 9) escape hatch
 assert tools.run_tool("run_python", {"code": "result = 21 * 2"}) == "42"
 
+# --- the subscription bridge: real HTTP against the live QTcpServer ---
+import json  # noqa: E402
+import threading  # noqa: E402
+import time  # noqa: E402
+import urllib.error  # noqa: E402
+import urllib.request  # noqa: E402
+
+from naksha import bridge  # noqa: E402
+
+srv = bridge.BridgeServer()
+info = json.loads(bridge.DISCOVERY.read_text())
+assert info["port"] == srv.port() and info["token"] == srv.token
+base = f"http://127.0.0.1:{info['port']}"
+results = {}
+
+
+def client():
+    def call(path, data=None, token=info["token"]):
+        req = urllib.request.Request(
+            base + path,
+            data=json.dumps(data).encode() if data is not None else None,
+            headers={"X-Naksha-Token": token, "Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read())
+
+    results["tools"] = call("/tools")
+    results["call"] = call("/call", {"name": "project_state", "args": {}})
+    try:
+        call("/tools", token="wrong")
+        results["bad_token"] = "allowed!"
+    except urllib.error.HTTPError as e:
+        results["bad_token"] = e.code
+
+
+t = threading.Thread(target=client, daemon=True)
+t.start()
+deadline = time.time() + 15
+while t.is_alive() and time.time() < deadline:
+    app.processEvents()
+    time.sleep(0.005)
+assert not t.is_alive(), "bridge client timed out"
+tool_names = {s["name"] for s in results["tools"]}
+assert {"project_state", "run_algorithm", "search_algorithms"} <= tool_names, tool_names
+assert "test_points" in results["call"]["result"], results["call"]
+assert results["bad_token"] == 403, results["bad_token"]
+srv.stop()
+assert not bridge.DISCOVERY.exists()  # token file cleaned up
+
 app.exitQgis()
 print("smoke: all green")
