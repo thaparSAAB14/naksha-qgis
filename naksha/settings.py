@@ -56,6 +56,9 @@ class NakshaSettings(QWidget):
         self.key_edit = QLineEdit()
         self.key_edit.setEchoMode(QLineEdit.Password)
         self.key_edit.setPlaceholderText("paste an API key (stored encrypted by QGIS)")
+        # Typing a key or endpoint re-asks that endpoint what it offers, so the
+        # model list always matches the key actually in use.
+        self.key_edit.editingFinished.connect(self._endpoint_changed)
         form.addRow("API key", self.key_edit)
 
         self.model_edit = QComboBox()
@@ -64,6 +67,7 @@ class NakshaSettings(QWidget):
 
         self.url_edit = QLineEdit()
         self.url_edit.setPlaceholderText("leave blank to use the provider default")
+        self.url_edit.editingFinished.connect(self._endpoint_changed)
         form.addRow("Endpoint", self.url_edit)
 
         test = QPushButton("Test connection")
@@ -170,16 +174,39 @@ class NakshaSettings(QWidget):
             self.model_edit.setCurrentText(model)
         self._refresh_status()
 
+    def _endpoint_changed(self):
+        """Endpoint or key was edited — store both, then re-probe so the model
+        list reflects what this key can actually reach."""
+        from qgis.core import QgsSettings
+
+        QgsSettings().setValue("naksha/base_url", self.url_edit.text().strip())
+        if self.key_edit.text().strip():
+            provider.set_api_key(self.key_edit.text().strip())
+        provider.invalidate()
+        self._refresh_status()
+
     def _refresh_status(self):
+        self.status.setText("checking…")
+        self.status.repaint()
         lines = []
         for _, label, ready, detail in provider.detect(self.bridge):
             lines.append(f"{'✓' if ready else '·'} {label} — {detail}")
         self.status.setText("\n".join(lines))
-        models = provider.ollama_models()
+
+        # The real probe: ask the configured endpoint what it offers. Works for
+        # OpenRouter, OpenAI, Groq, Ollama or any custom OpenAI-compatible URL.
+        available = provider.models()
+        if provider.active_base_url():
+            lines.append(
+                f"{'✓' if available else '·'} {provider.active_base_url()} — "
+                + (f"{len(available)} models" if available
+                   else "no model list (check the URL and key)")
+            )
+            self.status.setText("\n".join(lines))
         current = self.model_edit.currentText()
         self.model_edit.clear()
-        if models:
-            self.model_edit.addItems(models)
+        if available:
+            self.model_edit.addItems(available)
         self.model_edit.setCurrentText(current or provider.active_model())
 
     def _test(self):

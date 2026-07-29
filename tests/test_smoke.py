@@ -323,6 +323,23 @@ assert quick.parse("buffer test_points by 2 parsecs") is None
 assert "test_points" in quick.run("what's in my project")
 assert "styled" in quick.run("colour test_points blue")
 
+# --- model discovery (real network path) ---
+# This regressed silently once: QgsBlockingNetworkRequest has no setTimeout(),
+# so calling it raised AttributeError inside models(), which swallowed the
+# exception and returned [] — every model list was empty and nobody noticed.
+provider.invalidate()
+assert provider.models("http://127.0.0.1:9/v1", "", timeout_ms=800) == [], \
+    "a dead endpoint must degrade to an empty list, not raise"
+
+_live = provider.models("https://openrouter.ai/api/v1", "", timeout_ms=15000)
+if _live:
+    assert len(_live) > 20, f"expected a real OpenAI-compatible catalogue, got {_live[:3]}"
+    provider.models("https://openrouter.ai/api/v1", "sk-other", timeout_ms=800)
+    assert len(provider._probe_cache) >= 2, "cache must be keyed on the API key too"
+else:
+    print("smoke: skipped live model-discovery check (no network)")
+provider.invalidate()
+
 # --- provider resolution + settings round-trip ---
 from qgis.core import QgsSettings  # noqa: E402
 
@@ -330,14 +347,14 @@ QgsSettings().setValue("naksha/provider", "")
 QgsSettings().setValue("naksha/base_url", "")
 QgsSettings().setValue("naksha/model", "")
 provider.invalidate()
-provider.ollama_models = lambda *a, **k: []          # nothing local
+provider.models = lambda *a, **k: []                 # nothing local
 provider.api_key = lambda: ""                        # no key
 assert provider.resolve()[0] == "none", provider.resolve()
 assert provider.detect()[0][2] is False              # ollama reported not ready
 
 provider.api_key = lambda: "sk-test"                 # a key beats nothing
 assert provider.resolve()[0] == "groq", provider.resolve()
-provider.ollama_models = lambda *a, **k: ["qwen2.5:7b"]
+provider.models = lambda *a, **k: ["qwen2.5:7b"]
 assert provider.resolve()[0] == "groq", "a stored key should win over local by default"
 
 provider.api_key = lambda: ""                        # ollama alone is still usable
