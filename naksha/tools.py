@@ -1,8 +1,6 @@
 """Naksha's hand-written project tools — the few things Processing doesn't cover.
 Algorithm execution itself is introspected, see introspect.py."""
 
-import contextlib
-import io
 import os
 
 from qgis.core import QgsProject
@@ -100,8 +98,7 @@ def style_layer(layer_name="", mode="single", color="", field="", **_):
             categories.append(QgsRendererCategory(v, symbol, str(v)))
         lyr.setRenderer(QgsCategorizedSymbolRenderer(field, categories))
     else:
-        # ponytail: graduated deferred to M3 — the classification API churned across 3.x;
-        # run_python covers it meanwhile
+        # ponytail: graduated deferred — the classification API churned across 3.x
         return f"error: unknown mode '{mode}' (single | categorized)"
     lyr.triggerRepaint()
     return f"styled '{layer_name}' ({mode}{', by ' + field if field else ''})"
@@ -142,19 +139,11 @@ def save_project(path="", **_):
     return f"saved to {proj.fileName()}" if ok else "error: save failed (no path set?)"
 
 
-def run_python(code="", **_):
-    """Escape hatch: run PyQGIS code. Set a variable `result` to return a value."""
-    import qgis.core
-    import qgis.utils
-
-    scope = {"qgis": qgis, "QgsProject": QgsProject, "iface": qgis.utils.iface}
-    buf = io.StringIO()
-    with contextlib.redirect_stdout(buf):
-        exec(code, scope)  # the escape hatch IS the product; approval gate lands in M3
-    out = buf.getvalue()
-    if "result" in scope:
-        out += ("\n" if out else "") + repr(scope["result"])
-    return out or "(no output — print() or set `result`)"
+# There is deliberately no run_python / exec escape hatch. Running model-authored
+# Python inside QGIS is exactly the risk plugin review exists to catch (bandit B102,
+# critical and not waivable), and the ~700 introspected Processing algorithms plus the
+# project tools below cover the work. Humans who want raw PyQGIS already have QGIS's
+# own Python Console.
 
 
 _STR = {"type": "string"}
@@ -220,12 +209,6 @@ TOOLS = {
         "description": "Save the project (optionally to a new .qgz path).",
         "parameters": {"type": "object", "properties": {"path": _STR}},
         "func": save_project,
-    },
-    "run_python": {
-        "description": "Escape hatch: execute PyQGIS Python when no other tool fits. "
-        "print() output is returned; set `result` to return a value.",
-        "parameters": {"type": "object", "properties": {"code": _STR}, "required": ["code"]},
-        "func": run_python,
     },
 }
 

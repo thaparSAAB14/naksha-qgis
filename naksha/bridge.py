@@ -37,15 +37,18 @@ class BridgeServer(QObject):
     def port(self):
         return self.server.serverPort()
 
+    def _owns_discovery(self):
+        """True when the discovery file still points at this server. A second QGIS
+        instance may have replaced it, and its bridge is still listening."""
+        try:
+            return json.loads(DISCOVERY.read_text()).get("token") == self.token
+        except (OSError, ValueError):
+            return False  # unreadable or not ours either way: leave it alone
+
     def stop(self):
         self.server.close()
-        # Only remove the discovery file if it is still ours: a second QGIS
-        # instance may have replaced it, and its bridge is still listening.
-        try:
-            if json.loads(DISCOVERY.read_text()).get("token") == self.token:
-                DISCOVERY.unlink()
-        except (OSError, ValueError):
-            pass
+        if self._owns_discovery():
+            DISCOVERY.unlink(missing_ok=True)
 
     def _accept(self):
         while self.server.hasPendingConnections():

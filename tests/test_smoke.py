@@ -130,7 +130,10 @@ missing = tools.run_tool("query_features", {"layer_name": "ghost", "expression":
 assert "no layer named 'ghost'" in missing and "test_points" in missing, missing
 
 # 9) escape hatch
-assert tools.run_tool("run_python", {"code": "result = 21 * 2"}) == "42"
+# the exec() escape hatch is deliberately absent: bandit B102 is critical and not
+# waivable, so shipping it would make the plugin unlistable
+assert "run_python" not in tools.TOOLS
+assert tools.run_tool("run_python", {"code": "1"}).startswith("error: unknown tool")
 
 # --- the subscription bridge: real HTTP against the live QTcpServer ---
 import json  # noqa: E402
@@ -423,8 +426,13 @@ assert agent.run_turn([{"role": "user", "content": "save project"}],
                       cancelled=lambda: True) == "(cancelled)"
 
 # 13) healing: a CRS failure comes back with a plain-language next move
-healed = tools.run_tool("run_python", {"code": "raise ValueError('CRS mismatch between layers')"})
-assert "Hint" in healed and "reproject" in healed, healed
+assert "reproject" in tools._hint(ValueError("CRS mismatch between layers"))
+assert "fixgeometries" in tools._hint(RuntimeError("invalid geometry at feature 3"))
+assert tools._hint(RuntimeError("something unrecognised")) == ""
+# and a raising tool comes back as a model-readable error, never an exception
+healed = tools.run_tool("remove_layer", {"name": "no_such_layer"})
+assert healed.startswith("error: no layer named"), healed
+assert "test_points" in healed, "the error should list the real layer names"
 
 # 14) verify signal: a 0-feature output is flagged, not reported as success
 empty = tools.run_tool(

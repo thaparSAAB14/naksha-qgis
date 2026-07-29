@@ -10,7 +10,7 @@ def _version():
                 if line.startswith("version="):
                     return line.split("=", 1)[1].strip()
     except OSError:
-        pass
+        return "0"  # metadata.txt unreadable; the version is cosmetic, carry on
     return "0"
 
 
