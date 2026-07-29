@@ -71,6 +71,15 @@ Walkthrough screenshots are optional — drop PNGs named `01-dock.png`, `02-inst
 `03-settings.png`, `04-connect.png` into `naksha/help/` and the first-run guide picks them
 up; without them it renders as text.
 
+## Security
+
+Naksha **does not run AI-written code**. There is no `exec`, no `eval`, and no
+"run this Python" tool — the agent can only call a fixed set of QGIS operations and the
+Processing algorithms you already have. No subprocesses, no shell, no pickle, no bundled
+binaries, no third-party dependencies, no telemetry. Writes are gated by your approval mode
+and logged. Verified with the same tools plugins.qgis.org uses: **0 bandit findings,
+0 secrets, ruff clean** (see [docs/RELEASE.md](docs/RELEASE.md) to reproduce).
+
 ## Design rules
 
 1. **No pip dependencies** — stdlib + `qgis` + `qgis.PyQt` only. Users can't install

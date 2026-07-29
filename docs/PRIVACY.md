@@ -1,3 +1,18 @@
+# Security and privacy
+
+## Naksha does not run AI-written code
+
+There is no `exec`, no `eval`, and no "run this Python" tool. The agent can only call a
+fixed set of QGIS operations and the Processing algorithms you already have installed —
+it cannot invent new code to run. That is a deliberate limit, not an oversight: it is the
+main risk in an AI plugin, and the plugin repository's scanner treats it as critical and
+non-waivable.
+
+The package also contains no subprocess calls, no shell invocation, no pickle or YAML
+deserialisation, no bundled executables or binaries beyond the icon, and no third-party
+dependencies at all — only the Python standard library and QGIS's own API. Every write to
+your project is gated by the approval mode you choose, and logged to the "Naksha" tab.
+
 # What leaves your machine
 
 Naksha sends data to an AI model only when you send a message (or an MCP client app
