@@ -63,7 +63,8 @@ def fake_chat(messages, tool_specs):
 
 
 provider.chat = fake_chat
-history = [{"role": "user", "content": "what is in my project?"}]
+# deliberately open-ended: anything quick.py recognises never reaches the model
+history = [{"role": "user", "content": "find flood-exposed schools and make me a map"}]
 events = []
 answer = agent.run_turn(history, lambda kind, text: events.append((kind, text)))
 assert answer == "done", answer
@@ -71,6 +72,22 @@ assert len(calls) == 2
 assert events == [("tool", "project_state")]
 assert history[-1]["content"] == "done"  # turn persisted into history
 assert any(m["role"] == "tool" for m in history)  # tool exchange persisted too
+
+# the instant path answers without the provider being consulted at all
+calls.clear()
+instant_history = [{"role": "user", "content": "what is in my project?"}]
+seen = []
+instant = agent.run_turn(instant_history, lambda kind, text: seen.append((kind, text)))
+assert "test_points" in instant, instant
+assert calls == [], "quick path must not call the model"
+assert seen == [("quick", "project_state")], seen
+assert agent.HISTORY[-1]["path"] == "instant"
+assert agent.HISTORY[-1]["seconds"] < 1.0  # it is meant to feel immediate
+
+# the approval gate still governs the instant path (it can write, too)
+declined = agent.run_turn([{"role": "user", "content": "save project"}],
+                          gate=lambda n, a: "error: the user declined this action")
+assert "declined" in declined, declined
 
 # 4) unknown tool degrades into a model-visible error, not a crash
 assert tools.run_tool("nope", {}).startswith("error:")
@@ -276,6 +293,74 @@ assert Path(man["server"]["mcp_config"]["command"]).exists(), "manifest names a 
 
 shutil.rmtree(tmp, ignore_errors=True)
 
+# --- quick.py: the no-AI path. 'test_points' is in the project with a 'name' field ---
+from naksha import quick  # noqa: E402
+
+assert quick.parse("what's in my project") == ("project_state", {})
+assert quick.parse("Style Test_Points by name") == (
+    "style_layer", {"layer_name": "test_points", "mode": "categorized", "field": "name"})
+assert quick.parse("colour test_points red") == (
+    "style_layer", {"layer_name": "test_points", "mode": "single", "color": "red"})
+assert quick.parse("buffer test_points by 2 km") == (
+    "run_algorithm", {"algorithm_id": "native:buffer",
+                      "parameters": {"INPUT": "test_points", "DISTANCE": 2000.0}})
+assert quick.parse("zoom to test_points")[0] == "zoom_to"
+assert quick.parse("how many features in test_points")[0] == "query_features"
+assert quick.parse("save project") == ("save_project", {})
+
+# partial names resolve, unknown things defer to the AI rather than guessing
+assert quick.parse("zoom to points")[1]["layer_name"] == "test_points"
+assert quick.parse("colour ghost_layer red") is None
+assert quick.parse("style test_points by nosuchfield") is None
+assert quick.parse("find flood-exposed schools and make me a map") is None
+assert quick.parse("") is None
+assert quick.parse("buffer test_points by 2 parsecs") is None
+
+# and it actually executes, with no provider configured at all
+assert "test_points" in quick.run("what's in my project")
+assert "styled" in quick.run("colour test_points blue")
+
+# --- provider resolution + settings round-trip ---
+from qgis.core import QgsSettings  # noqa: E402
+
+QgsSettings().setValue("naksha/provider", "")
+QgsSettings().setValue("naksha/base_url", "")
+QgsSettings().setValue("naksha/model", "")
+provider.invalidate()
+provider.ollama_models = lambda *a, **k: []          # nothing local
+provider.api_key = lambda: ""                        # no key
+assert provider.resolve()[0] == "none", provider.resolve()
+assert provider.detect()[0][2] is False              # ollama reported not ready
+
+provider.api_key = lambda: "sk-test"                 # a key beats nothing
+assert provider.resolve()[0] == "groq", provider.resolve()
+provider.ollama_models = lambda *a, **k: ["qwen2.5:7b"]
+assert provider.resolve()[0] == "groq", "a stored key should win over local by default"
+
+provider.api_key = lambda: ""                        # ollama alone is still usable
+assert provider.resolve()[0] == "ollama", provider.resolve()
+
+QgsSettings().setValue("naksha/provider", "openai")  # explicit choice needs to be ready
+provider.api_key = lambda: "sk-test"
+assert provider.resolve()[0] == "openai", provider.resolve()
+QgsSettings().setValue("naksha/provider", "")
+
+# a live bridge client shows up as a source
+class _FakeBridge:
+    last_seen = time.time()
+    client = "Claude Code"
+
+assert any(s[0] == "bridge" for s in provider.detect(_FakeBridge())), provider.detect(_FakeBridge())
+
+# settings persist through QgsSettings, and agent honours max_steps
+QgsSettings().setValue("naksha/max_steps", 7)
+assert agent.max_steps() == 7
+QgsSettings().setValue("naksha/max_steps", 25)
+assert agent.system_prompt().startswith("You are Naksha")
+
+# every new module must import cleanly inside QGIS
+import naksha.connect, naksha.panels, naksha.settings  # noqa: E402, F401
+
 # --- M3: the trust loop ---
 from naksha.task import MainThreadBridge  # noqa: E402
 
@@ -325,14 +410,17 @@ def fake_chat_gate(messages, tool_specs):
 
 provider.chat = fake_chat_gate
 reply = agent.run_turn(
-    [{"role": "user", "content": "save my project"}],
+    [{"role": "user", "content": "tidy up my project however you think best"}],
     gate=lambda n, a: None if n in tools.READ_ONLY else "error: the user declined this action",
 )
 assert reply == "understood, not saving", reply
 
-# 12) cancellation aborts before any provider call
+# 12) cancellation aborts before any provider call (and before the quick path)
 provider.chat = lambda m, t: (_ for _ in ()).throw(AssertionError("provider called despite cancel"))
 assert agent.run_turn([{"role": "user", "content": "x"}], cancelled=lambda: True) == "(cancelled)"
+# a cancelled turn must not fire the instant path either - it can write to the project
+assert agent.run_turn([{"role": "user", "content": "save project"}],
+                      cancelled=lambda: True) == "(cancelled)"
 
 # 13) healing: a CRS failure comes back with a plain-language next move
 healed = tools.run_tool("run_python", {"code": "raise ValueError('CRS mismatch between layers')"})

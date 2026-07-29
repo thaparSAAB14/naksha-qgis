@@ -51,7 +51,7 @@ class AgentTask(QgsTask):
     turn_finished = pyqtSignal(str)
 
     def __init__(self, history, gate, bridge):
-        super().__init__("Naksha is working…", QgsTask.CanCancel)
+        super().__init__("Naksha is working...", QgsTask.CanCancel)
         self._history = history
         self._gate = gate
         self._bridge = bridge

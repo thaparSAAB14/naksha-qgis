@@ -5,10 +5,14 @@ description=Free, open-source AI agent for QGIS — state a goal in plain langua
 about=Naksha (नक्शा, "map") adds a dockable AI chat pane to QGIS. It inspects your project, runs
     Processing algorithms, and verifies its own outputs. Works with local Ollama (free, offline —
     nothing leaves your machine) or any OpenAI-compatible or Anthropic API. GPLv2+.
-version=0.2.0
-changelog=0.2.0 — introspected Processing tool engine, plan/verify/self-heal loop,
-    approval modes (ask/autonomous/read-only), threaded turns with cancel, MCP bridge
-    for AI subscription apps, styled chat. 0.1.0 — walking skeleton.
+version=0.3.0
+changelog=0.3.0 — settings UI (QGIS Options page and standalone dialog), automatic
+    detection of whichever AI is available, instant offline commands that need no model
+    at all, one-click connection for Claude Desktop/Code, Cursor, Windsurf and VS Code,
+    a double-click Claude connector bundle, first-run walkthrough, developer panel, and
+    a dependency-free MCP server. 0.2.0 — introspected Processing tool engine,
+    plan/verify/self-heal loop, approval modes, threaded turns with cancel, MCP bridge.
+    0.1.0 — walking skeleton.
 author=Naksha contributors
 email=connect@priyanshu.world
 experimental=True

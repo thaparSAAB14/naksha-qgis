@@ -1,10 +1,12 @@
-"""The agent turn: bounded tool-call loop with ambient context, an approval
-gate, and cooperative cancellation. Runs on a worker thread via task.py —
-everything touching QGIS goes through `main`."""
+"""The agent turn: an instant path for recognised commands, otherwise a bounded
+tool-call loop with ambient context, an approval gate, and cooperative cancellation.
+Runs on a worker thread via task.py — everything touching QGIS goes through `main`."""
 
 import json
+import time
+from collections import deque
 
-from . import provider, tools
+from . import provider, quick, tools
 
 SYSTEM = (
     "You are Naksha, an AI agent living inside QGIS. Use your tools to inspect and "
@@ -18,11 +20,23 @@ SYSTEM = (
 )
 
 MAX_STEPS = 25
+HISTORY = deque(maxlen=20)  # turn records for the developer panel; in memory only
+
+
+def system_prompt():
+    return str(provider.setting("system_prompt", "") or SYSTEM)
+
+
+def max_steps():
+    try:
+        return int(provider.setting("max_steps", MAX_STEPS) or MAX_STEPS)
+    except (TypeError, ValueError):
+        return MAX_STEPS
 
 
 def run_turn(history, on_event=lambda kind, text: None, main=None, cancelled=None, gate=None):
-    """Run one user turn. `history` is the chat so far (no system messages),
-    mutated in place so tool exchanges persist as context.
+    """Run one user turn. `history` is the chat so far (no system messages), mutated
+    in place so tool exchanges persist as context.
 
     main(fn)          -> run fn on the Qt main thread (default: call directly)
     cancelled()       -> True aborts between steps
@@ -30,17 +44,42 @@ def run_turn(history, on_event=lambda kind, text: None, main=None, cancelled=Non
     """
     main = main or (lambda fn: fn())
     cancelled = cancelled or (lambda: False)
+    if cancelled():  # checked before the instant path too, which can write
+        return "(cancelled)"
+    started = time.time()
+    record = {"asked": history[-1]["content"] if history else "", "calls": [], "path": "ai"}
+
+    # Recognised commands never reach a model: instant, offline, and impossible to
+    # hallucinate. Unrecognised input returns None and carries on below.
+    asked = history[-1]["content"] if history and history[-1].get("role") == "user" else ""
+    hit = main(lambda: quick.parse(asked))
+    if hit:
+        name, args = hit
+        on_event("quick", name)
+        blocked = gate(name, args) if gate else None
+        answer = blocked or main(lambda: tools.run_tool(name, args))
+        history.append({"role": "assistant", "content": answer})
+        record.update(path="instant", calls=[name], seconds=round(time.time() - started, 3),
+                      answer=answer)
+        HISTORY.append(record)
+        return answer
+
     context = {"role": "system", "content": "Current project state:\n" + main(tools.project_state)}
-    msgs = [{"role": "system", "content": SYSTEM}, context] + history
+    msgs = [{"role": "system", "content": system_prompt()}, context] + history
 
     def finish(text):
         history[:] = msgs[2:]
+        record.update(seconds=round(time.time() - started, 3), answer=text, messages=msgs)
+        HISTORY.append(record)
         return text
 
-    for _ in range(MAX_STEPS):
+    for _ in range(max_steps()):
         if cancelled():
             return finish("(cancelled)")
         msg = provider.chat(msgs, tools.openai_tool_specs())
+        record.setdefault("raw", []).append(msg)
+        if msg.get("usage"):
+            record["usage"] = msg["usage"]
         msgs.append(msg)
         calls = msg.get("tool_calls") or []
         if not calls:
@@ -52,6 +91,7 @@ def run_turn(history, on_event=lambda kind, text: None, main=None, cancelled=Non
             except ValueError:
                 args = {}
             on_event("tool", name)
+            record["calls"].append(name)
             result = (gate(name, args) if gate else None) or main(lambda: tools.run_tool(name, args))
             msgs.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": result})
     return finish("(stopped: reached the step limit)")

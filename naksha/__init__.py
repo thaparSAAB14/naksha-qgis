@@ -15,6 +15,7 @@ def _version():
 
 
 __version__ = _version()
+ICON = os.path.join(os.path.dirname(__file__), "icon.png")
 
 
 def classFactory(iface):
