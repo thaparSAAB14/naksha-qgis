@@ -202,6 +202,80 @@ assert srv2.mcp({"jsonrpc": "2.0", "id": 5, "method": "bogus"})["error"]["code"]
 assert srv2.last_seen == 0.0  # mcp() itself is transport-agnostic; _route stamps last_seen
 srv2.stop()
 
+# --- connect.py: it writes OTHER apps' config files, so prove it never clobbers them ---
+import shutil  # noqa: E402
+import tempfile  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from naksha import connect  # noqa: E402
+
+tmp = Path(tempfile.mkdtemp(prefix="naksha_connect_"))
+cfg = tmp / "claude_desktop_config.json"
+ORIGINAL = {
+    "mcpServers": {"someone-else": {"command": "node", "args": ["their-server.js"]}},
+    "unrelatedSetting": {"theme": "dark", "nested": [1, 2, 3]},
+}
+cfg.write_text(json.dumps(ORIGINAL, indent=2), encoding="utf-8")
+connect.CLIENTS = {"test-app": ("Test App", cfg, "mcpServers")}
+
+assert connect.status() == [("test-app", "Test App", True, False)], connect.status()
+connect.connect("test-app")
+
+after = json.loads(cfg.read_text(encoding="utf-8"))
+assert after["mcpServers"]["someone-else"] == ORIGINAL["mcpServers"]["someone-else"], "clobbered another server!"
+assert after["unrelatedSetting"] == ORIGINAL["unrelatedSetting"], "clobbered unrelated settings!"
+assert after["mcpServers"]["naksha"]["command"].lower().endswith("python.exe")
+assert after["mcpServers"]["naksha"]["args"][0].endswith("mcp_server.py")
+assert Path(str(cfg) + ".bak").exists(), "no backup written before modifying someone's config"
+assert connect.status()[0][3] is True  # now reports connected
+
+connect.disconnect("test-app")
+restored = json.loads(cfg.read_text(encoding="utf-8"))
+assert restored == ORIGINAL, f"disconnect did not restore the file: {restored}"
+assert connect.disconnect("test-app").endswith("was not connected.")
+
+# malformed config must be refused, never overwritten
+bad = tmp / "bad.json"
+bad.write_text("{ this is not json", encoding="utf-8")
+connect.CLIENTS = {"bad-app": ("Bad App", bad, "mcpServers")}
+try:
+    connect.connect("bad-app")
+    raise AssertionError("should have refused malformed JSON")
+except ValueError as e:
+    assert "not valid JSON" in str(e), e
+assert bad.read_text(encoding="utf-8") == "{ this is not json", "overwrote a file it could not parse"
+
+# VS Code keys its servers under "servers", not "mcpServers"
+vs = tmp / "vscode.json"
+vs.write_text(json.dumps({"servers": {"other": {"command": "x"}}}), encoding="utf-8")
+connect.CLIENTS = {"vscode": ("VS Code", vs, "servers")}
+connect.connect("vscode")
+vsdata = json.loads(vs.read_text(encoding="utf-8"))
+assert "naksha" in vsdata["servers"] and "other" in vsdata["servers"], vsdata
+assert "mcpServers" not in vsdata, "wrote the wrong key for this client"
+
+# a client whose config dir does not exist is simply not offered
+connect.CLIENTS = {"ghost": ("Ghost", tmp / "nope" / "deep" / "x.json", "mcpServers")}
+assert connect.status() == [("ghost", "Ghost", False, False)]
+
+# the Claude connector bundle must match the MCPB spec or it silently fails to install
+import zipfile  # noqa: E402
+
+bundle = connect.build_connector(tmp)
+assert bundle.name == "naksha-connector.mcpb"
+with zipfile.ZipFile(bundle) as z:
+    assert "manifest.json" in z.namelist() and "server/mcp_server.py" in z.namelist(), z.namelist()
+    man = json.loads(z.read("manifest.json"))
+for required in ("manifest_version", "name", "version", "description", "author", "server"):
+    assert required in man, f"manifest missing required field {required}"
+assert man["author"]["name"], "author.name is required by the spec"
+assert man["server"]["type"] == "python"
+assert man["server"]["entry_point"] == "server/mcp_server.py"
+assert man["server"]["mcp_config"]["args"] == ["${__dirname}/server/mcp_server.py"]
+assert Path(man["server"]["mcp_config"]["command"]).exists(), "manifest names a python that isn't there"
+
+shutil.rmtree(tmp, ignore_errors=True)
+
 # --- M3: the trust loop ---
 from naksha.task import MainThreadBridge  # noqa: E402
 
