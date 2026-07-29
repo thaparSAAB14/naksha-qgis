@@ -173,6 +173,35 @@ assert json.loads(bridge.DISCOVERY.read_text())["token"] == second.token
 second.stop()
 assert not bridge.DISCOVERY.exists()
 
+# --- MCP protocol (bridge.mcp is the single implementation both transports use) ---
+srv2 = bridge.BridgeServer()
+init = srv2.mcp({"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                 "params": {"clientInfo": {"name": "smoke-client"}}})
+assert init["result"]["protocolVersion"] == bridge.PROTOCOL, init
+assert init["result"]["serverInfo"]["name"] == "naksha"
+assert init["result"]["serverInfo"]["version"] != "0", "metadata.txt version not picked up"
+assert srv2.client == "smoke-client"
+
+listed = srv2.mcp({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})["result"]["tools"]
+names = {t["name"] for t in listed}
+assert {"project_state", "run_algorithm", "search_algorithms"} <= names, names
+assert all("inputSchema" in t for t in listed), "MCP requires inputSchema, not parameters"
+
+called = srv2.mcp({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+                   "params": {"name": "project_state", "arguments": {}}})["result"]
+assert "test_points" in called["content"][0]["text"], called
+assert called["isError"] is False
+
+# a failing tool reports through content so the model can react, not as an RPC error
+bad = srv2.mcp({"jsonrpc": "2.0", "id": 4, "method": "tools/call",
+                "params": {"name": "nope", "arguments": {}}})["result"]
+assert bad["isError"] is True and bad["content"][0]["text"].startswith("error:")
+
+assert srv2.mcp({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
+assert srv2.mcp({"jsonrpc": "2.0", "id": 5, "method": "bogus"})["error"]["code"] == -32601
+assert srv2.last_seen == 0.0  # mcp() itself is transport-agnostic; _route stamps last_seen
+srv2.stop()
+
 # --- M3: the trust loop ---
 from naksha.task import MainThreadBridge  # noqa: E402
 

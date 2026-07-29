@@ -1,69 +1,73 @@
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["mcp>=1.2"]
-# ///
-"""MCP stdio proxy for Naksha — drive live QGIS from the AI subscription you already pay for.
+"""MCP stdio server for Naksha — drive live QGIS from any AI app that speaks MCP.
 
-Any MCP client app (the desktop/CLI agents bundled with Claude, ChatGPT, Gemini
-subscriptions, agentic IDEs, ...) can use this. Example registration:
+Pure standard library on purpose: no `mcp` package, no `uv`, no pip, no venv. Run it
+with the Python that ships inside QGIS and it just works:
 
-    claude mcp add naksha -- uv run C:\\path\\to\\naksha_mcp.py
+    "C:\\Program Files\\QGIS 3.40.13\\bin\\python-qgis-ltr.bat" naksha_mcp.py
 
-Requires QGIS to be running with the Naksha plugin's "AI Bridge" toggled on
-(Plugins → Naksha → AI Bridge). This file lives OUTSIDE the plugin package —
-pip deps are fine here, never inside naksha/.
+All protocol handling lives in the plugin (naksha/bridge.py). This file only moves
+JSON-RPC frames between the client's stdin/stdout and the plugin's localhost endpoint,
+so there is exactly one implementation of MCP to keep correct.
+
+Requires QGIS running with the AI Bridge on (Plugins -> Naksha -> AI Bridge).
 """
 
-import asyncio
 import json
+import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
-
 DISCOVERY = Path.home() / ".naksha" / "bridge.json"
+BRIDGE_DOWN = (
+    "QGIS is not reachable. Start QGIS and turn on the AI Bridge "
+    "(Plugins -> Naksha -> AI Bridge), then retry."
+)
 
 
-def _request(path, data=None):
-    try:
-        info = json.loads(DISCOVERY.read_text())
-    except OSError:
-        raise RuntimeError(
-            "QGIS is not running with Naksha's AI Bridge enabled "
-            "(in QGIS: Plugins → Naksha → AI Bridge)"
-        ) from None
+def forward(message):
+    """POST one JSON-RPC message to the running plugin and return its reply."""
+    info = json.loads(DISCOVERY.read_text())  # re-read every time: the port changes per session
     req = urllib.request.Request(
-        f"http://127.0.0.1:{info['port']}{path}",
-        data=json.dumps(data).encode() if data is not None else None,
+        f"http://127.0.0.1:{info['port']}/mcp",
+        data=json.dumps(message).encode(),
         headers={"X-Naksha-Token": info["token"], "Content-Type": "application/json"},
     )
     with urllib.request.urlopen(req, timeout=600) as resp:
         return json.loads(resp.read())
 
 
-app = Server("naksha")
-
-
-@app.list_tools()
-async def list_tools():
-    return [
-        Tool(name=s["name"], description=s["description"], inputSchema=s["parameters"])
-        for s in _request("/tools")
-    ]
-
-
-@app.call_tool()
-async def call_tool(name, arguments):
-    result = _request("/call", {"name": name, "args": arguments or {}})
-    return [TextContent(type="text", text=result["result"])]
-
-
-async def main():
-    async with stdio_server() as (read, write):
-        await app.run(read, write, app.create_initialization_options())
+def main():
+    out = sys.stdout
+    for line in sys.stdin:  # MCP stdio framing is newline-delimited JSON
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            message = json.loads(line)
+        except ValueError:
+            continue  # nothing sane to reply to
+        try:
+            reply = forward(message)
+        except Exception as e:  # noqa: BLE001 - a dead pipe must still answer the client
+            if message.get("id") is None:
+                continue  # a notification we cannot deliver needs no reply
+            # HTTPError subclasses URLError, so it has to be tested first or a stale
+            # plugin (404 on /mcp) would be misreported as "QGIS is not running".
+            if isinstance(e, urllib.error.HTTPError):
+                detail = (f"bridge answered HTTP {e.code}. If this is 404, the running "
+                          f"QGIS has an older Naksha loaded - restart QGIS.")
+            elif isinstance(e, (FileNotFoundError, urllib.error.URLError)):
+                detail = BRIDGE_DOWN
+            else:
+                detail = f"{type(e).__name__}: {e}"
+            reply = {"jsonrpc": "2.0", "id": message["id"],
+                     "error": {"code": -32603, "message": detail}}
+        if reply is None:
+            continue  # notification: the protocol expects silence
+        out.write(json.dumps(reply) + "\n")
+        out.flush()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

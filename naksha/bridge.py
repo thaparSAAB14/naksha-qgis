@@ -9,20 +9,24 @@ no threads, every tool body stays on the main thread by construction.
 
 import json
 import secrets
+import time
 from pathlib import Path
 
 from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtNetwork import QHostAddress, QTcpServer
 
-from . import tools
+from . import __version__, tools
 
 DISCOVERY = Path.home() / ".naksha" / "bridge.json"
+PROTOCOL = "2024-11-05"
 
 
 class BridgeServer(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.token = secrets.token_hex(16)
+        self.last_seen = 0.0  # epoch of the last authenticated call
+        self.client = ""  # name the MCP client gave us at initialize
         self.server = QTcpServer(self)
         if not self.server.listen(QHostAddress.LocalHost, 0):
             raise RuntimeError(f"bridge could not listen: {self.server.errorString()}")
@@ -74,6 +78,7 @@ class BridgeServer(QObject):
     def _route(self, request_line, headers, body):
         if headers.get("x-naksha-token") != self.token:
             return b"403 Forbidden", {"error": "bad or missing X-Naksha-Token"}
+        self.last_seen = time.time()
         method, path = request_line.split(" ", 2)[:2]
         if method == "GET" and path == "/tools":
             return b"200 OK", [
@@ -86,4 +91,50 @@ class BridgeServer(QObject):
             except ValueError:
                 return b"400 Bad Request", {"error": "invalid JSON body"}
             return b"200 OK", {"result": tools.run_tool(req.get("name", ""), req.get("args") or {})}
+        if method == "POST" and path == "/mcp":
+            try:
+                req = json.loads(body)
+            except ValueError:
+                return b"400 Bad Request", _rpc_error(None, -32700, "parse error")
+            return b"200 OK", self.mcp(req)
         return b"404 Not Found", {"error": "unknown endpoint"}
+
+    # --- MCP protocol lives here, once. naksha_mcp.py just forwards to it, and
+    # --- clients that speak MCP over HTTP can POST here directly.
+    def mcp(self, req):
+        """Handle one JSON-RPC message. Returns the response, or None for a notification."""
+        rpc_id = req.get("id")
+        method = req.get("method", "")
+        if rpc_id is None:  # notification: acknowledge nothing
+            return None
+        if method == "initialize":
+            self.client = (req.get("params") or {}).get("clientInfo", {}).get("name", "") or ""
+            return _rpc_ok(rpc_id, {
+                "protocolVersion": PROTOCOL,
+                "capabilities": {"tools": {"listChanged": False}},
+                "serverInfo": {"name": "naksha", "version": __version__},
+            })
+        if method == "ping":
+            return _rpc_ok(rpc_id, {})
+        if method == "tools/list":
+            return _rpc_ok(rpc_id, {"tools": [
+                {"name": n, "description": t["description"], "inputSchema": t["parameters"]}
+                for n, t in tools.TOOLS.items()
+            ]})
+        if method == "tools/call":
+            params = req.get("params") or {}
+            text = tools.run_tool(params.get("name", ""), params.get("arguments") or {})
+            # tool failures come back as content, not an RPC error, so the model can react
+            return _rpc_ok(rpc_id, {
+                "content": [{"type": "text", "text": text}],
+                "isError": text.startswith("error:"),
+            })
+        return _rpc_error(rpc_id, -32601, f"unknown method '{method}'")
+
+
+def _rpc_ok(rpc_id, result):
+    return {"jsonrpc": "2.0", "id": rpc_id, "result": result}
+
+
+def _rpc_error(rpc_id, code, message):
+    return {"jsonrpc": "2.0", "id": rpc_id, "error": {"code": code, "message": message}}
