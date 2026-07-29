@@ -32,9 +32,10 @@ MODES = ("Ask before writing", "Autonomous", "Read-only")
 
 
 class NakshaSettings(QWidget):
-    def __init__(self, parent=None, bridge=None):
+    def __init__(self, parent=None, plugin=None):
         super().__init__(parent)
-        self.bridge = bridge
+        self.plugin = plugin
+        self.bridge = getattr(plugin, "bridge", None)
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
@@ -97,6 +98,14 @@ class NakshaSettings(QWidget):
         )
         hint.setWordWrap(True)
         aform.addWidget(hint)
+
+        self.bridge_toggle = QCheckBox("Allow connected apps to control this QGIS session")
+        self.bridge_toggle.toggled.connect(self._toggle_bridge)
+        aform.addWidget(self.bridge_toggle)
+        self.bridge_status = QLabel()
+        self.bridge_status.setWordWrap(True)
+        self.bridge_status.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        aform.addWidget(self.bridge_status)
         self.app_rows = {}
         for cid, label, installed, _ in connect.status():
             if not installed:
@@ -181,7 +190,30 @@ class NakshaSettings(QWidget):
         self.test_result.setText(("✓ " if ok else "✗ ") + message)
 
     # --- connected apps --------------------------------------------------
+    def _toggle_bridge(self, on):
+        if self.plugin is None:
+            return
+        self.plugin.set_bridge(on)
+        self.bridge = self.plugin.bridge
+        self._refresh_bridge()
+
+    def _refresh_bridge(self):
+        bridge = getattr(self.plugin, "bridge", None) if self.plugin else None
+        self.bridge_toggle.blockSignals(True)
+        self.bridge_toggle.setChecked(bridge is not None)
+        self.bridge_toggle.blockSignals(False)
+        if bridge is None:
+            self.bridge_status.setText(
+                "Off — turn this on before connecting an app, or it will have nothing to talk to."
+            )
+        else:
+            self.bridge_status.setText(
+                f"On — listening on 127.0.0.1:{bridge.port()} (this machine only).\n"
+                f"Apps that take a URL instead: http://127.0.0.1:{bridge.port()}/mcp"
+            )
+
     def _refresh_apps(self):
+        self._refresh_bridge()
         for cid, label, _, connected in connect.status():
             if cid in self.app_rows:
                 self.app_rows[cid].setText("Disconnect" if connected else "Connect")
@@ -215,12 +247,12 @@ class NakshaSettings(QWidget):
 class NakshaSettingsDialog(QDialog):
     """Standalone home for the same widget, opened from the dock or the plugin menu."""
 
-    def __init__(self, parent=None, bridge=None):
+    def __init__(self, parent=None, plugin=None):
         super().__init__(parent)
         self.setWindowTitle("Naksha settings")
         self.setWindowIcon(QIcon(ICON))
         self.setMinimumWidth(520)
-        self.panel = NakshaSettings(self, bridge)
+        self.panel = NakshaSettings(self, plugin)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self._accept)
         buttons.rejected.connect(self.reject)
@@ -234,9 +266,9 @@ class NakshaSettingsDialog(QDialog):
 
 
 class _OptionsPage(QgsOptionsPageWidget):
-    def __init__(self, parent, bridge):
+    def __init__(self, parent, plugin):
         super().__init__(parent)
-        self.panel = NakshaSettings(self, bridge)
+        self.panel = NakshaSettings(self, plugin)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.panel)
@@ -248,13 +280,13 @@ class _OptionsPage(QgsOptionsPageWidget):
 class NakshaOptionsFactory(QgsOptionsWidgetFactory):
     """Puts Naksha into Settings → Options, alongside every other QGIS setting."""
 
-    def __init__(self, bridge_getter):
+    def __init__(self, plugin):
         super().__init__()
-        self._bridge_getter = bridge_getter
+        self._plugin = plugin
         self.setTitle("Naksha")
 
     def icon(self):
         return QIcon(ICON)
 
     def createWidget(self, parent):
-        return _OptionsPage(parent, self._bridge_getter())
+        return _OptionsPage(parent, self._plugin)

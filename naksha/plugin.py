@@ -50,7 +50,7 @@ class NakshaPlugin:
         self._add_menu(self._make_action("Getting started", self.show_welcome))
         self._add_menu(self._make_action("Developer tools", self.open_devtools))
 
-        self.options = settings.NakshaOptionsFactory(lambda: self.bridge)
+        self.options = settings.NakshaOptionsFactory(self)
         self.iface.registerOptionsWidgetFactory(self.options)
 
         if QgsSettings().value("naksha/bridge_enabled", False, type=bool):
@@ -88,7 +88,7 @@ class NakshaPlugin:
         self.dock.setVisible(checked)
 
     def open_settings(self):
-        dialog = settings.NakshaSettingsDialog(self.iface.mainWindow(), self.bridge)
+        dialog = settings.NakshaSettingsDialog(self.iface.mainWindow(), self)
         if dialog.exec_() and self.dock is not None:
             self.dock.refresh_status()
 

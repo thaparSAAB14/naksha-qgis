@@ -4,84 +4,72 @@
 a dockable chat pane where you state a goal in plain language and Naksha inspects the
 project, runs the work, and reports back with real numbers.
 
-**Status: v0.2.0, experimental.** The agent discovers and runs any Processing algorithm you
+**Status: v0.3.0, experimental.** The agent discovers and runs any Processing algorithm you
 have installed — introspected live from the registry, so GRASS, GDAL, PDAL and third-party
 plugin algorithms all come for free (715 on the developer's machine; your count depends on
 your providers). It **verifies its own outputs** (a 0-feature "success" gets flagged and fixed,
 not reported), and runs threaded with native cancel. Three approval modes: *Ask before
-writing* (default), *Autonomous*, *Read-only*. Providers: any OpenAI-compatible endpoint
-(local [Ollama](https://ollama.com) by default — free, offline), or bring your existing
-AI subscription via the MCP bridge below. See [docs/PRIVACY.md](docs/PRIVACY.md).
+writing* (default), *Autonomous*, *Read-only*. See [docs/PRIVACY.md](docs/PRIVACY.md).
 
-## Install (development)
+## Install
 
-Requires QGIS **3.40 LTR** or newer. Link the plugin into your profile
-(no elevation needed — junctions are plain-user; adjust paths if your profile differs):
+**Have a release ZIP?** In QGIS: **Plugins → Manage and Install Plugins → Install from ZIP**.
 
-```powershell
-New-Item -ItemType Junction -Path "$env:APPDATA\QGIS\QGIS3\profiles\default\python\plugins\naksha" -Target "C:\Users\ps103\Downloads\Naksha\naksha"
-```
+**Working from this repo?** Close QGIS and double-click **`install.bat`**. It copies the
+plugin into your QGIS profile and enables it. (It refuses to run while QGIS is open,
+because QGIS rewrites its settings on exit and would undo the change.)
 
-Then in QGIS: **Plugins → Manage and Install Plugins → Installed → check "Naksha"**
-(enable *experimental* plugins in Settings). A toolbar "N" button opens the chat dock.
+Requires QGIS **3.40 LTR** or newer. Start QGIS and look for the teal **N** in the toolbar.
+A first-run walkthrough explains the rest.
 
-## Configure
+## Works with no setup at all
 
-Defaults target local Ollama (`http://localhost:11434/v1`, model `qwen2.5:7b`):
+Plenty of commands never touch an AI — they run instantly, offline, with no account,
+no key and nothing installed:
 
-```
-ollama pull qwen2.5:7b
-```
+> *colour roads by highway* · *buffer schools by 500 m* · *zoom to contours* ·
+> *how many features in parcels* · *what's in my project* · *save project*
 
-To use a hosted provider instead, open the QGIS Python console (**Plugins → Python Console**).
+Only open-ended requests ("find flood-exposed schools and map them") need a model.
 
-> **Paste one line at a time.** The console's `>>>` prompt compiles a single statement, so
-> pasting a multi-line block fails with `SyntaxError: multiple statements found`. The lines
-> below are each self-contained — semicolons keep them to one statement apiece.
+## Pick an AI — three ways, all free
 
-Line 1, the endpoint and model (this example is Groq):
+Everything lives in **⚙ Settings** (also under *Settings → Options → Naksha*). Naksha
+detects what's available and shows it in the dock header; you never configure twice.
 
-```python
-from qgis.core import QgsSettings; QgsSettings().setValue("naksha/base_url", "https://api.groq.com/openai/v1"); QgsSettings().setValue("naksha/model", "llama-3.3-70b-versatile")
-```
+| | What it costs | Setup |
+|---|---|---|
+| **The app you already pay for** | Nothing extra | *Connect an AI app*, one click |
+| **Local Ollama** | Free, fully offline | Install [Ollama](https://ollama.com), pull a model |
+| **An API key** | Provider's rates | Paste it into Settings (stored encrypted) |
 
-Line 2, your API key — replace the placeholder with your real key before running it:
+### Use the subscription you already have
 
-```python
-from qgis.core import QgsApplication; QgsApplication.authManager().storeAuthSetting("naksha/api_key", "PASTE_YOUR_KEY_HERE", True)
-```
+If you pay for Claude, ChatGPT or similar, its desktop app speaks **MCP** — so it can drive
+this QGIS session directly. Your subscription does the thinking; the map updates in front
+of you.
 
-The key goes into QGIS's encrypted auth store, never a plain file. A settings dialog is
-planned. If nothing is configured, Naksha targets local Ollama — and if Ollama isn't
-running you'll see `Error: Connection refused`, which means "no provider reachable", not
-a bug in the plugin.
+1. **⚙ Settings → Connect an AI app to QGIS**
+2. Click **Connect** next to Claude Desktop, Claude Code, Cursor, Windsurf or VS Code
+3. Restart that app and ask it *"what's in my QGIS project?"*
 
-## Use the AI subscription you already pay for
-
-No API key needed: if you already pay for an AI assistant (Claude, ChatGPT, Gemini —
-or use an agentic IDE), its desktop/CLI app is an **MCP client**, and Naksha ships an MCP
-bridge that lets it drive your live QGIS session. Your subscription does the thinking;
-QGIS updates in front of you.
-
-1. In QGIS: **Plugins → Naksha → AI Bridge** (one click, remembered).
-2. Register the proxy with your AI app (needs [uv](https://docs.astral.sh/uv/); examples):
-
-   ```bash
-   claude mcp add naksha -- uv run C:\path\to\Naksha\naksha_mcp.py
-   ```
-
-   Claude Desktop / other MCP apps — add to their MCP config:
-
-   ```json
-   {"mcpServers": {"naksha": {"command": "uv", "args": ["run", "C:\\path\\to\\Naksha\\naksha_mcp.py"]}}}
-   ```
-
-3. Ask your assistant: *"what's in my QGIS project?"* — it discovers every Naksha tool
-   (search/describe/run any of the ~1000 Processing algorithms included).
+There is nothing to install: the MCP server is a single standard-library file run by the
+Python already inside QGIS — no `uv`, no `pip`, no virtualenv. For Claude Desktop you can
+instead press **Build Claude connector (.mcpb)** and double-click the result.
 
 The bridge is localhost-only with a per-session token, off by default, and every call is
-logged to the "Naksha" log tab. Note: assistants without an MCP client app (e.g. an
-X Premium plan) can't be bridged — use their API with the built-in provider instead.
+logged to the "Naksha" tab. Apps with no MCP client (an X Premium plan, most browser
+extensions) can't be connected this way — use an API key instead.
+
+## For developers
+
+**⚙ Settings → Show developer tools** adds *Plugins → Naksha → Developer tools*: the exact
+JSON sent and received each turn, per-turn timing/tokens/tool counts, a browser over the
+introspected algorithm catalogue, and bridge diagnostics.
+
+Walkthrough screenshots are optional — drop PNGs named `01-dock.png`, `02-instant.png`,
+`03-settings.png`, `04-connect.png` into `naksha/help/` and the first-run guide picks them
+up; without them it renders as text.
 
 ## Design rules
 
