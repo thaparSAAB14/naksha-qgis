@@ -110,18 +110,25 @@ class NakshaSettings(QWidget):
         self.bridge_status.setWordWrap(True)
         self.bridge_status.setTextInteractionFlags(Qt.TextSelectableByMouse)
         aform.addWidget(self.bridge_status)
+        # Rows are rebuilt on every refresh rather than built once here: apps get
+        # installed while QGIS is running, and a row that only exists at start-up
+        # cannot show that.
         self.app_rows = {}
-        for cid, label, installed, _ in connect.status():
-            if not installed:
-                continue
-            btn = QPushButton()
-            btn.clicked.connect(lambda _=False, c=cid: self._toggle_app(c))
-            name = QLabel(label)
-            line = QHBoxLayout()
-            line.addWidget(name, 1)
-            line.addWidget(btn)
-            aform.addWidget(self._wrap(line))
-            self.app_rows[cid] = btn
+        self.apps_rows_box = QVBoxLayout()
+        self.apps_rows_box.setContentsMargins(0, 0, 0, 0)
+        aform.addLayout(self.apps_rows_box)
+        self.apps_summary = QLabel()
+        self.apps_summary.setWordWrap(True)
+        aform.addWidget(self.apps_summary)
+
+        rescan = QPushButton("Refresh — scan for AI apps")
+        rescan.setToolTip(
+            "Look again for AI apps, IDEs and coding agents on this machine, and "
+            "re-check which AI this plugin can reach."
+        )
+        rescan.clicked.connect(self._rescan)
+        aform.addWidget(rescan)
+
         bundle = QPushButton("Build Claude connector (.mcpb)…")
         bundle.clicked.connect(self._build_connector)
         aform.addWidget(bundle)
@@ -239,11 +246,56 @@ class NakshaSettings(QWidget):
                 f"Apps that take a URL instead: http://127.0.0.1:{bridge.port()}/mcp"
             )
 
-    def _refresh_apps(self):
+    @staticmethod
+    def _empty(layout):
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+
+    def _refresh_apps(self, found=None):
+        """Rebuild the app list from a fresh scan of this machine."""
         self._refresh_bridge()
-        for cid, label, _, connected in connect.status():
-            if cid in self.app_rows:
-                self.app_rows[cid].setText("Disconnect" if connected else "Connect")
+        self._empty(self.apps_rows_box)
+        self.app_rows = {}
+        here, elsewhere = [], []
+        for cid, label, installed, connected in (found or connect.status()):
+            if not installed:
+                elsewhere.append(label)
+                continue
+            here.append(label)
+            btn = QPushButton("Disconnect" if connected else "Connect")
+            btn.clicked.connect(lambda _=False, c=cid: self._toggle_app(c))
+            line = QHBoxLayout()
+            line.addWidget(QLabel(f"{'✓' if connected else '·'}  {label}"), 1)
+            line.addWidget(btn)
+            self.apps_rows_box.addWidget(self._wrap(line))
+            self.app_rows[cid] = btn
+        if here:
+            self.apps_summary.setText(
+                f"Found {len(here)}: {', '.join(here)}."
+                + (f" Not on this machine: {', '.join(elsewhere)}." if elsewhere else "")
+            )
+        else:
+            self.apps_summary.setText(
+                "No AI app found yet. Looked for: " + ", ".join(elsewhere)
+                + ".\nAny app that speaks MCP can also be pointed at the URL above by hand."
+            )
+
+    def _rescan(self):
+        """The refresh button: re-detect both halves of 'what can drive QGIS'.
+
+        Apps can be installed after QGIS started, and a provider can come up (or a
+        key be pasted) after we last looked — so this also drops the model-list
+        cache instead of reporting a stale 'nothing answered'.
+        """
+        self.apps_summary.setText("scanning…")
+        self.apps_summary.repaint()
+        found = connect.rescan()
+        provider.invalidate()
+        self._refresh_apps(found)
+        self._refresh_status()
 
     def _toggle_app(self, client_id):
         connected = dict((c[0], c[3]) for c in connect.status())[client_id]

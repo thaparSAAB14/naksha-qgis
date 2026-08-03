@@ -210,7 +210,37 @@ TOOLS = {
         "parameters": {"type": "object", "properties": {"path": _STR}},
         "func": save_project,
     },
+    "create_layout": {
+        "description": "Build a print layout: map at a fixed scale, legend limited to the "
+        "layers you name (so basemaps stay out of it), bar scale, north arrow, title and a "
+        "source statement. Rebuilds the layout if one of that name already exists.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "layout name"},
+                "title": _STR,
+                "subtitle": _STR,
+                "sources": {"type": "string", "description": "data source / credit text"},
+                "scale": {"type": "number", "description": "map scale denominator, e.g. 50000"},
+                "legend_layers": {"type": "array", "items": _STR,
+                                  "description": "layer names to show in the legend, in order"},
+                "extent_layer": {"type": "string", "description": "layer to centre the map on"},
+                "width": {"type": "number", "description": "page width in mm (default 420 = A3)"},
+                "height": {"type": "number", "description": "page height in mm (default 297)"},
+            },
+        },
+        "func": None,  # bound below, so importing layout.py stays lazy
+    },
 }
+
+
+def _create_layout(**kwargs):
+    from .layout import create_layout
+
+    return create_layout(**kwargs)
+
+
+TOOLS["create_layout"]["func"] = _create_layout
 
 
 def openai_tool_specs():

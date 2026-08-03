@@ -25,13 +25,16 @@ def _config_paths():
         appdata = Path(os.environ.get("APPDATA", home / "AppData" / "Roaming"))
         claude_desktop = appdata / "Claude" / "claude_desktop_config.json"
         vscode = appdata / "Code" / "User" / "mcp.json"
+        vscode_insiders = appdata / "Code - Insiders" / "User" / "mcp.json"
     elif system == "Darwin":
         support = home / "Library" / "Application Support"
         claude_desktop = support / "Claude" / "claude_desktop_config.json"
         vscode = support / "Code" / "User" / "mcp.json"
+        vscode_insiders = support / "Code - Insiders" / "User" / "mcp.json"
     else:
         claude_desktop = home / ".config" / "Claude" / "claude_desktop_config.json"
         vscode = home / ".config" / "Code" / "User" / "mcp.json"
+        vscode_insiders = home / ".config" / "Code - Insiders" / "User" / "mcp.json"
     return {
         # id: (label, path, key holding the server map)
         "claude-desktop": ("Claude Desktop", claude_desktop, "mcpServers"),
@@ -39,6 +42,7 @@ def _config_paths():
         "cursor": ("Cursor", home / ".cursor" / "mcp.json", "mcpServers"),
         "windsurf": ("Windsurf", home / ".codeium" / "windsurf" / "mcp_config.json", "mcpServers"),
         "vscode": ("VS Code", vscode, "servers"),
+        "vscode-insiders": ("VS Code Insiders", vscode_insiders, "servers"),
     }
 
 
@@ -91,7 +95,11 @@ def _write(path, data):
 
 
 def status():
-    """[(id, label, installed, connected)] for every known client."""
+    """[(id, label, installed, connected)] for every known client.
+
+    Reads the filesystem on every call, so it is also the rescan: an app installed
+    after QGIS started shows up the next time this is asked.
+    """
     out = []
     for cid, (label, path, key) in CLIENTS.items():
         installed = path.exists() or path.parent.exists()
@@ -103,6 +111,19 @@ def status():
                 connected = False
         out.append((cid, label, installed, connected))
     return out
+
+
+def rescan():
+    """Re-derive the client table, then report status.
+
+    CLIENTS is built at import time from $APPDATA/$HOME, and the UI built its rows
+    from whatever existed then — so a coding agent installed mid-session stayed
+    invisible until QGIS restarted. Re-deriving here costs nothing and makes the
+    refresh button honest about both halves: where we look, and what is there now.
+    """
+    global CLIENTS
+    CLIENTS = _config_paths()
+    return status()
 
 
 def connect(client_id):

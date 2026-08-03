@@ -129,6 +129,31 @@ assert "styled" in tools.run_tool("style_layer", {"layer_name": "test_points", "
 missing = tools.run_tool("query_features", {"layer_name": "ghost", "expression": "1"})
 assert "no layer named 'ghost'" in missing and "test_points" in missing, missing
 
+# 8b) a print layout with a legend restricted to named layers.
+# A legend is built from the layer tree, and this layer was added outside it, so
+# put it in the tree first - otherwise the legend can only ever come back empty.
+QgsProject.instance().layerTreeRoot().addLayer(layer)
+layout_msg = tools.run_tool("create_layout", {
+    "name": "Smoke layout", "title": "Test sheet", "scale": 50000,
+    "legend_layers": ["test_points"], "extent_layer": "test_points",
+    "sources": "Synthetic test data.",
+})
+assert "Smoke layout" in layout_msg and "1:50,000" in layout_msg, layout_msg
+layouts = QgsProject.instance().layoutManager().printLayouts()
+sheet = next(lay for lay in layouts if lay.name() == "Smoke layout")
+from qgis.core import QgsLayoutItemLegend, QgsLayoutItemMap  # noqa: E402
+
+maps = [i for i in sheet.items() if isinstance(i, QgsLayoutItemMap)]
+legends = [i for i in sheet.items() if isinstance(i, QgsLayoutItemLegend)]
+assert len(maps) == 1 and len(legends) == 1, (maps, legends)
+assert abs(maps[0].scale() - 50000) < 1, maps[0].scale()
+listed = [n.layer().name() for n in legends[0].model().rootGroup().findLayers() if n.layer()]
+assert listed == ["test_points"], f"legend should list only what was asked for: {listed}"
+# rebuilding must replace, not accumulate
+tools.run_tool("create_layout", {"name": "Smoke layout", "scale": 25000})
+assert len([lay for lay in QgsProject.instance().layoutManager().printLayouts()
+            if lay.name() == "Smoke layout"]) == 1
+
 # 9) escape hatch
 # the exec() escape hatch is deliberately absent: bandit B102 is critical and not
 # waivable, so shipping it would make the plugin unlistable
@@ -277,6 +302,19 @@ assert "mcpServers" not in vsdata, "wrote the wrong key for this client"
 # a client whose config dir does not exist is simply not offered
 connect.CLIENTS = {"ghost": ("Ghost", tmp / "nope" / "deep" / "x.json", "mcpServers")}
 assert connect.status() == [("ghost", "Ghost", False, False)]
+
+# rescan() must rebuild the real client table, not keep whatever a caller stubbed in.
+# This is what the settings Refresh button relies on: an app installed after QGIS
+# started has to become visible without a restart.
+_scanned = connect.rescan()
+assert connect.CLIENTS is not None and "ghost" not in connect.CLIENTS, connect.CLIENTS
+assert {c[0] for c in _scanned} == set(connect.CLIENTS), "rescan must report every known client"
+assert all(len(row) == 4 for row in _scanned), _scanned
+for _cid in ("claude-desktop", "claude-code", "cursor", "windsurf", "vscode", "vscode-insiders"):
+    assert _cid in connect.CLIENTS, f"{_cid} missing from the scan table"
+# the two VS Code channels are distinct files and must not collide
+assert connect.CLIENTS["vscode"][1] != connect.CLIENTS["vscode-insiders"][1]
+assert connect.CLIENTS["vscode-insiders"][2] == "servers", "Insiders uses VS Code's schema"
 
 # the Claude connector bundle must match the MCPB spec or it silently fails to install
 import zipfile  # noqa: E402

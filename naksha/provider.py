@@ -36,6 +36,11 @@ DEFAULTS = {"base_url": PRESETS["ollama"][1], "model": "qwen2.5:7b"}
 # (base_url, key) -> (checked_at, [model ids]). Keyed on both so switching
 # endpoint or pasting a new key refetches instead of showing the old list.
 _probe_cache = {}  # ponytail: 30 s TTL, good enough for a settings dialog
+# An endpoint that answered nothing is remembered for longer: resolve() runs on
+# every turn and always probes the optional local Ollama, so a 30 s memory means
+# a blocking re-probe (and a log line) every few turns on machines without it.
+# invalidate() still fires whenever the user changes provider, URL or key.
+_TTL_OK, _TTL_DEAD = 30, 300
 
 
 def setting(key, default=None):
@@ -72,7 +77,7 @@ def models(base_url=None, key=None, timeout_ms=4000):
         return []
     key = api_key() if key is None else key
     cached = _probe_cache.get((base, key))
-    if cached and time.time() - cached[0] < 30:
+    if cached and time.time() - cached[0] < (_TTL_OK if cached[1] else _TTL_DEAD):
         return cached[1]
     found = []
     try:
@@ -84,7 +89,12 @@ def models(base_url=None, key=None, timeout_ms=4000):
             req.setRawHeader(b"Authorization", b"Bearer " + key.encode())
         blocking = QgsBlockingNetworkRequest()
         if blocking.get(req) == QgsBlockingNetworkRequest.NoError:
-            payload = json.loads(bytes(blocking.reply().content()))
+            body = bytes(blocking.reply().content())
+            # A refused connection can still come back NoError with an empty body
+            # (Ollama not installed is the everyday case). That is an answer of
+            # "no models", not a fault — parsing it only produced a JSON error in
+            # the log that named neither the cause nor the cure.
+            payload = json.loads(body) if body else {}
             entries = payload.get("data") or payload.get("models") or []
             found = sorted(
                 str(m.get("id") or m.get("name"))
