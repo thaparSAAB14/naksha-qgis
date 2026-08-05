@@ -69,8 +69,14 @@ def _label(layout, text, x, y, width, height, size, bold=False, colour="#1a1a1a"
 
 
 def create_layout(name="Naksha map", title="", subtitle="", sources="", scale=50000,
-                  legend_layers=None, extent_layer="", width=420, height=297, **_):
-    """Build (or rebuild) a print layout and return a description of it."""
+                  legend_layers=None, extent_layer="", width=420, height=297,
+                  sources_below=True, **_):
+    """Build (or rebuild) a print layout and return a description of it.
+
+    sources_below puts the source statement in a full-width band under the map,
+    which is where a reader expects marginalia on a map sheet; set it False to
+    keep the text in the side column beneath the legend.
+    """
     proj = QgsProject.instance()
     manager = proj.layoutManager()
     for old in [lay for lay in manager.printLayouts() if lay.name() == name]:
@@ -84,8 +90,9 @@ def create_layout(name="Naksha map", title="", subtitle="", sources="", scale=50
     margin = 12.0
     legend_w = 62.0
     header = 20.0 if title else margin
+    footer = 26.0 if (sources and sources_below) else 0.0
     map_w = width - legend_w - margin * 3
-    map_h = height - header - margin * 2
+    map_h = height - header - margin * 2 - footer
 
     # --- map ---------------------------------------------------------------
     map_item = QgsLayoutItemMap(layout)
@@ -119,7 +126,8 @@ def create_layout(name="Naksha map", title="", subtitle="", sources="", scale=50
         _prune(legend.model().rootGroup(), {lyr.id() for lyr in wanted})
     legend.setResizeToContents(True)
     legend.attemptMove(QgsLayoutPoint(margin * 2 + map_w, header + 4, MM))
-    legend.attemptResize(QgsLayoutSize(legend_w, map_h * 0.7, MM))
+    legend_h = map_h if sources_below else map_h * 0.7
+    legend.attemptResize(QgsLayoutSize(legend_w, legend_h, MM))
 
     # --- title block -------------------------------------------------------
     if title:
@@ -150,12 +158,20 @@ def create_layout(name="Naksha map", title="", subtitle="", sources="", scale=50
             break
 
     # --- scale statement and sources ---------------------------------------
-    _label(layout, f"Scale 1:{int(scale):,}".replace(",", " "),
-           margin * 2 + map_w, header + 4 + map_h * 0.7 + 4, legend_w, 5, 8, bold=True)
-    if sources:
-        _label(layout, sources, margin * 2 + map_w,
-               header + 4 + map_h * 0.7 + 11, legend_w, map_h * 0.3 - 12, 6.5,
-               colour="#555555")
+    if sources and sources_below:
+        # Cartographic nomenclature belongs under the map, spanning its width, so it
+        # reads as a caption to the sheet rather than a footnote to the legend.
+        base = header + 4 + map_h + 4
+        _label(layout, f"Scale 1:{int(scale):,}".replace(",", " "),
+               margin, base, map_w, 5, 8.5, bold=True)
+        _label(layout, sources, margin, base + 6, map_w, footer - 8, 7, colour="#444444")
+    else:
+        _label(layout, f"Scale 1:{int(scale):,}".replace(",", " "),
+               margin * 2 + map_w, header + 4 + map_h * 0.7 + 4, legend_w, 5, 8, bold=True)
+        if sources:
+            _label(layout, sources, margin * 2 + map_w,
+                   header + 4 + map_h * 0.7 + 11, legend_w, map_h * 0.3 - 12, 6.5,
+                   colour="#555555")
 
     manager.addLayout(layout)
     shown = [n.layer().name() for n in legend.model().rootGroup().findLayers() if n.layer()]

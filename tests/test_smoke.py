@@ -154,6 +154,29 @@ tools.run_tool("create_layout", {"name": "Smoke layout", "scale": 25000})
 assert len([lay for lay in QgsProject.instance().layoutManager().printLayouts()
             if lay.name() == "Smoke layout"]) == 1
 
+# sources below the map must leave the map shorter and put the text under it
+from qgis.core import QgsLayoutItemLabel  # noqa: E402
+
+def _sheet(**kw):
+    """Read the geometry out immediately - rebuilding the layout destroys the
+    previous C++ items, so holding on to them across calls raises."""
+    tools.run_tool("create_layout", dict({"name": "Pos test", "title": "T",
+                                          "sources": "SRC", "scale": 50000}, **kw))
+    lay = next(x for x in QgsProject.instance().layoutManager().printLayouts()
+               if x.name() == "Pos test")
+    m = next(i for i in lay.items() if isinstance(i, QgsLayoutItemMap))
+    src = next(i for i in lay.items()
+               if isinstance(i, QgsLayoutItemLabel) and i.text() == "SRC")
+    return {"map_h": m.rect().height(), "map_bottom": m.pos().y() + m.rect().height(),
+            "map_right": m.pos().x() + m.rect().width(),
+            "src_x": src.pos().x(), "src_y": src.pos().y()}
+
+below = _sheet(sources_below=True)
+side = _sheet(sources_below=False)
+assert below["map_h"] < side["map_h"], "footer band not reserved"
+assert below["src_y"] > below["map_bottom"] - 1, "sources not below the map"
+assert side["src_x"] > side["map_right"], "sources not in the side column"
+
 # 9) escape hatch
 # the exec() escape hatch is deliberately absent: bandit B102 is critical and not
 # waivable, so shipping it would make the plugin unlistable
