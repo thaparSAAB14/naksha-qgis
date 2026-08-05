@@ -17,6 +17,8 @@ from qgis.core import (
     QgsLayoutMeasurement,
     QgsLayoutPoint,
     QgsLayoutSize,
+    QgsLegendRenderer,
+    QgsLegendStyle,
     QgsPrintLayout,
     QgsProject,
     QgsTextFormat,
@@ -123,7 +125,14 @@ def create_layout(name="Naksha map", title="", subtitle="", sources="", scale=50
         wanted.extend(proj.mapLayersByName(wanted_name))
     if wanted:
         legend.setAutoUpdateModel(False)
-        _prune(legend.model().rootGroup(), {lyr.id() for lyr in wanted})
+        root = legend.model().rootGroup()
+        _prune(root, {lyr.id() for lyr in wanted})
+        # A group heading earns its place only when it collects several entries.
+        # Left alone, the layer tree's organisational folders ("Stanley Park
+        # drainage" wrapping one layer) print as headings over nothing.
+        for node in root.findGroups(recursive=True):
+            if len(node.findLayers()) < 2:
+                QgsLegendRenderer.setNodeLegendStyle(node, QgsLegendStyle.Hidden)
     legend.setResizeToContents(True)
     legend.attemptMove(QgsLayoutPoint(margin * 2 + map_w, header + 4, MM))
     legend_h = map_h if sources_below else map_h * 0.7

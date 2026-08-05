@@ -13,7 +13,7 @@ import secrets
 import time
 from pathlib import Path
 
-from qgis.PyQt.QtCore import QObject
+from qgis.PyQt.QtCore import QObject, QTimer
 from qgis.PyQt.QtNetwork import QHostAddress, QTcpServer
 
 from . import __version__, tools
@@ -33,11 +33,26 @@ class BridgeServer(QObject):
             raise RuntimeError(f"bridge could not listen: {self.server.errorString()}")
         self.server.newConnection.connect(self._accept)
         DISCOVERY.parent.mkdir(exist_ok=True)
+        self._write_discovery()
+        # A second QGIS shutting down can still take this file with it, leaving a
+        # perfectly healthy server that no client can find. Rewrite it whenever it
+        # goes missing - only when missing, so two live instances never fight over
+        # it. ponytail: 10 s poll; a filesystem watcher only if that ever feels slow.
+        self._heartbeat = QTimer(self)
+        self._heartbeat.timeout.connect(self._ensure_discovery)
+        self._heartbeat.start(10_000)
+
+    def _write_discovery(self):
         # pid is here so a client can tell WHICH QGIS it reached. Two instances
         # running at once silently diverge otherwise: the tool list comes from one
         # and the calls land on the other.
+        DISCOVERY.parent.mkdir(exist_ok=True)
         DISCOVERY.write_text(json.dumps(
             {"port": self.port(), "token": self.token, "pid": os.getpid()}))
+
+    def _ensure_discovery(self):
+        if not DISCOVERY.exists():
+            self._write_discovery()
 
     def port(self):
         return self.server.serverPort()
@@ -51,6 +66,7 @@ class BridgeServer(QObject):
             return False  # unreadable or not ours either way: leave it alone
 
     def stop(self):
+        self._heartbeat.stop()
         self.server.close()
         if self._owns_discovery():
             DISCOVERY.unlink(missing_ok=True)

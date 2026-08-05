@@ -244,6 +244,12 @@ assert bridge.DISCOVERY.exists(), "stale shutdown deleted the live instance's fi
 info = json.loads(bridge.DISCOVERY.read_text())
 assert info["token"] == second.token
 assert info["pid"] == os.getpid()  # lets a client tell which QGIS it reached
+# a live server whose file was deleted by someone else must restore it
+bridge.DISCOVERY.unlink()
+second._ensure_discovery()
+assert bridge.DISCOVERY.exists(), "live bridge did not restore its own discovery file"
+assert json.loads(bridge.DISCOVERY.read_text())["port"] == second.port()
+
 second.stop()
 assert not bridge.DISCOVERY.exists()
 
