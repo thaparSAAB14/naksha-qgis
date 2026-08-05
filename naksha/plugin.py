@@ -64,7 +64,10 @@ class NakshaPlugin:
         if self.options is not None:
             self.iface.unregisterOptionsWidgetFactory(self.options)
             self.options = None
-        self.set_bridge(False)
+        # remember=False: shutting QGIS down must not rewrite the user's preference.
+        # It used to, so the bridge came back off after every restart and every
+        # plugin reload, which read as "the bridge keeps dying on its own".
+        self.set_bridge(False, remember=False)
         if self.dock is not None:
             self.iface.removeDockWidget(self.dock)
             self.dock = None
@@ -102,8 +105,9 @@ class NakshaPlugin:
         panels.DevTools(lambda: self.bridge, self.iface.mainWindow()).show()
 
     # --- the localhost bridge -------------------------------------------
-    def set_bridge(self, on):
-        QgsSettings().setValue("naksha/bridge_enabled", bool(on))
+    def set_bridge(self, on, remember=True):
+        if remember:
+            QgsSettings().setValue("naksha/bridge_enabled", bool(on))
         if on and self.bridge is None:
             try:
                 self.bridge = bridge.BridgeServer()

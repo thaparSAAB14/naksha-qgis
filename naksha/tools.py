@@ -139,6 +139,19 @@ def save_project(path="", **_):
     return f"saved to {proj.fileName()}" if ok else "error: save failed (no path set?)"
 
 
+def reload_plugin(**_):
+    """Reload Naksha so newly added or edited tools appear, without restarting QGIS."""
+    import qgis.utils
+    from qgis.PyQt.QtCore import QTimer
+
+    # Deferred on purpose: reloading unloads the bridge that is serving this very
+    # request, so replying first is the difference between a clean answer and a
+    # dead socket.
+    QTimer.singleShot(400, lambda: qgis.utils.reloadPlugin("naksha"))
+    return ("reload scheduled. The bridge stops and restarts on a NEW port within a "
+            "couple of seconds - re-read ~/.naksha/bridge.json before the next call.")
+
+
 # There is deliberately no run_python / exec escape hatch. Running model-authored
 # Python inside QGIS is exactly the risk plugin review exists to catch (bandit B102,
 # critical and not waivable), and the ~700 introspected Processing algorithms plus the
@@ -210,6 +223,13 @@ TOOLS = {
         "parameters": {"type": "object", "properties": {"path": _STR}},
         "func": save_project,
     },
+    "reload_plugin": {
+        "description": "Reload Naksha inside the running QGIS so tools added or changed "
+        "on disk become available. Use when a tool you expect is reported unknown. The "
+        "bridge restarts on a new port.",
+        "parameters": {"type": "object", "properties": {}},
+        "func": reload_plugin,
+    },
     "create_layout": {
         "description": "Build a print layout: map at a fixed scale, legend limited to the "
         "layers you name (so basemaps stay out of it), bar scale, north arrow, title and a "
@@ -278,7 +298,11 @@ READ_ONLY = {"project_state", "search_algorithms", "describe_algorithm", "query_
 
 def run_tool(name, args):
     if name not in TOOLS:
-        return f"error: unknown tool '{name}'"
+        # A stale plugin is the usual cause: the tool exists on disk but this QGIS
+        # loaded before it was written. Say so rather than just denying the name.
+        return (f"error: unknown tool '{name}'. Available: {', '.join(sorted(TOOLS))}."
+                f" If you expected a newer tool, this QGIS may be running older code"
+                f" - call reload_plugin.")
     try:
         return str(TOOLS[name]["func"](**args))
     except Exception as e:  # result goes back to the model, which can react

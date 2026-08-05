@@ -8,6 +8,7 @@ no threads, every tool body stays on the main thread by construction.
 """
 
 import json
+import os
 import secrets
 import time
 from pathlib import Path
@@ -32,7 +33,11 @@ class BridgeServer(QObject):
             raise RuntimeError(f"bridge could not listen: {self.server.errorString()}")
         self.server.newConnection.connect(self._accept)
         DISCOVERY.parent.mkdir(exist_ok=True)
-        DISCOVERY.write_text(json.dumps({"port": self.port(), "token": self.token}))
+        # pid is here so a client can tell WHICH QGIS it reached. Two instances
+        # running at once silently diverge otherwise: the tool list comes from one
+        # and the calls land on the other.
+        DISCOVERY.write_text(json.dumps(
+            {"port": self.port(), "token": self.token, "pid": os.getpid()}))
 
     def port(self):
         return self.server.serverPort()

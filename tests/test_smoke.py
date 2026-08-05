@@ -90,7 +90,11 @@ declined = agent.run_turn([{"role": "user", "content": "save project"}],
 assert "declined" in declined, declined
 
 # 4) unknown tool degrades into a model-visible error, not a crash
-assert tools.run_tool("nope", {}).startswith("error:")
+unknown = tools.run_tool("nope", {})
+assert unknown.startswith("error: unknown tool 'nope'"), unknown
+# the stale-plugin case cost a whole debugging detour, so the message must name it
+assert "reload_plugin" in unknown and "project_state" in unknown, unknown
+assert "reload_plugin" in tools.TOOLS
 
 # 5) plugin module imports cleanly (instantiation needs the real GUI)
 import naksha.plugin  # noqa: E402, F401
@@ -237,7 +241,9 @@ first = bridge.BridgeServer()
 second = bridge.BridgeServer()  # replaces the discovery file with its own
 first.stop()  # must NOT delete the file it no longer owns
 assert bridge.DISCOVERY.exists(), "stale shutdown deleted the live instance's file"
-assert json.loads(bridge.DISCOVERY.read_text())["token"] == second.token
+info = json.loads(bridge.DISCOVERY.read_text())
+assert info["token"] == second.token
+assert info["pid"] == os.getpid()  # lets a client tell which QGIS it reached
 second.stop()
 assert not bridge.DISCOVERY.exists()
 
