@@ -96,6 +96,24 @@ assert unknown.startswith("error: unknown tool 'nope'"), unknown
 assert "reload_plugin" in unknown and "project_state" in unknown, unknown
 assert "reload_plugin" in tools.TOOLS
 
+# display flags a .qml cannot set: a layer can be styled perfectly and still draw nothing
+from qgis.core import QgsPalLayerSettings, QgsVectorLayerSimpleLabeling  # noqa: E402
+
+_pal = QgsPalLayerSettings()
+_pal.fieldName = "name"
+layer.setLabeling(QgsVectorLayerSimpleLabeling(_pal))  # labelsEnabled needs something to enable
+QgsProject.instance().layerTreeRoot().addLayer(layer)
+node = QgsProject.instance().layerTreeRoot().findLayer(layer.id())
+node.setItemVisibilityChecked(False)
+layer.setLabelsEnabled(False)
+msg = tools.run_tool("set_layer_display", {"layer_name": "test_points",
+                                           "visible": True, "labels": True})
+assert "visible=True" in msg and "labels=True" in msg, msg
+assert node.itemVisibilityChecked(), "layer not ticked in the tree"
+assert layer.labelsEnabled(), "labels not enabled"
+assert tools.run_tool("set_layer_display", {"layer_name": "ghost", "visible": True}) \
+    .startswith("error: no layer named")
+
 # 5) plugin module imports cleanly (instantiation needs the real GUI)
 import naksha.plugin  # noqa: E402, F401
 
@@ -136,7 +154,9 @@ assert "no layer named 'ghost'" in missing and "test_points" in missing, missing
 # 8b) a print layout with a legend restricted to named layers.
 # A legend is built from the layer tree, and this layer was added outside it, so
 # put it in the tree first - otherwise the legend can only ever come back empty.
-QgsProject.instance().layerTreeRoot().addLayer(layer)
+# (The display-flags check above may already have done it; twice would double-list.)
+if QgsProject.instance().layerTreeRoot().findLayer(layer.id()) is None:
+    QgsProject.instance().layerTreeRoot().addLayer(layer)
 layout_msg = tools.run_tool("create_layout", {
     "name": "Smoke layout", "title": "Test sheet", "scale": 50000,
     "legend_layers": ["test_points"], "extent_layer": "test_points",

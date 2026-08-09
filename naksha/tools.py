@@ -139,6 +139,30 @@ def save_project(path="", **_):
     return f"saved to {proj.fileName()}" if ok else "error: save failed (no path set?)"
 
 
+def set_layer_display(layer_name="", visible=None, labels=None, **_):
+    """Switch a layer on/off in the map, and turn its labels on/off.
+
+    Both are layer *display* flags rather than style, so a .qml cannot set them -
+    a layer can carry a perfectly good labelling definition and still draw nothing
+    because labelsEnabled is false, or because the tree entry is unchecked.
+    """
+    layer = _layer(layer_name)
+    done = []
+    if visible is not None:
+        node = QgsProject.instance().layerTreeRoot().findLayer(layer.id())
+        if node is None:
+            return f"error: '{layer_name}' is not in the layer tree"
+        node.setItemVisibilityChecked(bool(visible))
+        done.append(f"visible={bool(visible)}")
+    if labels is not None:
+        if not hasattr(layer, "setLabelsEnabled"):
+            return f"error: '{layer_name}' is not a layer that can carry labels"
+        layer.setLabelsEnabled(bool(labels))
+        done.append(f"labels={bool(labels)}")
+    layer.triggerRepaint()
+    return f"{layer_name}: {', '.join(done)}" if done else "nothing to change"
+
+
 def reload_plugin(**_):
     """Reload Naksha so newly added or edited tools appear, without restarting QGIS."""
     import qgis.utils
@@ -222,6 +246,21 @@ TOOLS = {
         "description": "Save the project (optionally to a new .qgz path).",
         "parameters": {"type": "object", "properties": {"path": _STR}},
         "func": save_project,
+    },
+    "set_layer_display": {
+        "description": "Show or hide a layer on the map, and enable or disable its labels. "
+        "These are display flags a style file cannot set, so use this when a layer has "
+        "styling or labelling that is not appearing.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "layer_name": _STR,
+                "visible": {"type": "boolean", "description": "tick/untick it in the layer list"},
+                "labels": {"type": "boolean", "description": "draw its labels or not"},
+            },
+            "required": ["layer_name"],
+        },
+        "func": set_layer_display,
     },
     "reload_plugin": {
         "description": "Reload Naksha inside the running QGIS so tools added or changed "
