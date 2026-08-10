@@ -206,6 +206,9 @@ assert not [i for i in _lay.items()
 below = _sheet(sources_below=True)
 side = _sheet(sources_below=False)
 assert below["map_h"] < side["map_h"], "footer band not reserved"
+# a taller band must come out of the map, not off the bottom of the page
+tall = _sheet(sources_below=True, footer_height=50)
+assert tall["map_h"] < below["map_h"], "footer_height ignored"
 assert below["src_y"] > below["map_bottom"] - 1, "sources not below the map"
 assert side["src_x"] > side["map_right"], "sources not in the side column"
 

@@ -72,7 +72,8 @@ def _label(layout, text, x, y, width, height, size, bold=False, colour="#1a1a1a"
 
 def create_layout(name="Naksha map", title="", subtitle="", sources="", scale=50000,
                   legend_layers=None, extent_layer="", width=420, height=297,
-                  sources_below=True, scale_label=True, sources_size=9, **_):
+                  sources_below=True, scale_label=True, sources_size=9,
+                  footer_height=None, **_):
     """Build (or rebuild) a print layout and return a description of it.
 
     sources_below puts the source statement in a full-width band under the map,
@@ -92,7 +93,9 @@ def create_layout(name="Naksha map", title="", subtitle="", sources="", scale=50
     margin = 12.0
     legend_w = 62.0
     header = 20.0 if title else margin
-    footer = 26.0 if (sources and sources_below) else 0.0
+    # A long source block needs a taller band or it is silently clipped at the
+    # page edge, so the caller can say how much room to reserve.
+    footer = (footer_height or 26.0) if (sources and sources_below) else 0.0
     map_w = width - legend_w - margin * 3
     map_h = height - header - margin * 2 - footer
 
