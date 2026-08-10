@@ -122,7 +122,15 @@ def layout_export(layout_name="", path="", **_):
     layouts = QgsProject.instance().layoutManager().printLayouts()
     if not layouts:
         return "error: the project has no print layouts"
-    layout = next((l for l in layouts if l.name() == layout_name), layouts[0])
+    if layout_name:
+        # Falling back to layouts[0] on a name miss silently exported the WRONG
+        # sheet - the worst possible failure, because the file looks fine.
+        layout = next((l for l in layouts if l.name() == layout_name), None)
+        if layout is None:
+            names = ", ".join(repr(l.name()) for l in layouts)
+            return f"error: no layout named '{layout_name}'. Layouts: {names}"
+    else:
+        layout = layouts[0]
     exporter = QgsLayoutExporter(layout)
     if path.lower().endswith(".pdf"):
         ok = exporter.exportToPdf(path, QgsLayoutExporter.PdfExportSettings())

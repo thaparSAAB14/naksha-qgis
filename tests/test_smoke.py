@@ -178,6 +178,13 @@ tools.run_tool("create_layout", {"name": "Smoke layout", "scale": 25000})
 assert len([lay for lay in QgsProject.instance().layoutManager().printLayouts()
             if lay.name() == "Smoke layout"]) == 1
 
+# a mistyped layout name must fail loudly, never export a different sheet
+missed = tools.run_tool("layout_export", {"layout_name": "no such layout",
+                                          "path": r"C:\Windows\Temp\naksha_should_not_exist.png"})
+assert missed.startswith("error: no layout named"), missed
+assert "Smoke layout" in missed, "the error should list what IS available"
+assert not os.path.exists(r"C:\Windows\Temp\naksha_should_not_exist.png")
+
 # sources below the map must leave the map shorter and put the text under it
 from qgis.core import QgsLayoutItemLabel  # noqa: E402
 
