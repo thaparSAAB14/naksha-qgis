@@ -72,7 +72,7 @@ def _label(layout, text, x, y, width, height, size, bold=False, colour="#1a1a1a"
 
 def create_layout(name="Naksha map", title="", subtitle="", sources="", scale=50000,
                   legend_layers=None, extent_layer="", width=420, height=297,
-                  sources_below=True, **_):
+                  sources_below=True, scale_label=True, sources_size=9, **_):
     """Build (or rebuild) a print layout and return a description of it.
 
     sources_below puts the source statement in a full-width band under the map,
@@ -149,7 +149,7 @@ def create_layout(name="Naksha map", title="", subtitle="", sources="", scale=50
     bar.setStyle("Single Box")
     bar.setLinkedMap(map_item)
     bar.applyDefaultSize(QgsUnitTypes.DistanceKilometers)
-    bar.setTextFormat(_text_format(7))
+    bar.setTextFormat(_text_format(11, bold=True))  # a bar scale nobody can read is decoration
     layout.addLayoutItem(bar)
     bar.attemptMove(QgsLayoutPoint(margin + 2, header + map_h - 10, MM))
 
@@ -171,9 +171,13 @@ def create_layout(name="Naksha map", title="", subtitle="", sources="", scale=50
         # Cartographic nomenclature belongs under the map, spanning its width, so it
         # reads as a caption to the sheet rather than a footnote to the legend.
         base = header + 4 + map_h + 4
-        _label(layout, f"Scale 1:{int(scale):,}".replace(",", " "),
-               margin, base, map_w, 5, 8.5, bold=True)
-        _label(layout, sources, margin, base + 6, map_w, footer - 8, 7, colour="#444444")
+        if scale_label:
+            # Redundant when a bar scale is already on the map; off by request.
+            _label(layout, f"Scale 1:{int(scale):,}".replace(",", " "),
+                   margin, base, map_w, 5, 8.5, bold=True)
+            base += 6
+        _label(layout, sources, margin, base, map_w, footer - 4, sources_size,
+               colour="#333333")
     else:
         _label(layout, f"Scale 1:{int(scale):,}".replace(",", " "),
                margin * 2 + map_w, header + 4 + map_h * 0.7 + 4, legend_w, 5, 8, bold=True)

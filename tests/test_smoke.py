@@ -195,6 +195,14 @@ def _sheet(**kw):
             "map_right": m.pos().x() + m.rect().width(),
             "src_x": src.pos().x(), "src_y": src.pos().y()}
 
+# the scale statement is optional: a bar scale on the map already carries it
+_sheet(sources_below=True, scale_label=False)
+_lay = next(x for x in QgsProject.instance().layoutManager().printLayouts()
+            if x.name() == "Pos test")
+assert not [i for i in _lay.items()
+            if isinstance(i, QgsLayoutItemLabel) and i.text().startswith("Scale 1:")], \
+    "scale statement should be absent when scale_label is False"
+
 below = _sheet(sources_below=True)
 side = _sheet(sources_below=False)
 assert below["map_h"] < side["map_h"], "footer band not reserved"
