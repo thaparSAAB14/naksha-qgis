@@ -83,7 +83,10 @@ def create_layout(name="Naksha map", title="", subtitle="", sources="", scale=50
     lock_layers pins the map to an explicit layer list instead of following the
     live canvas. Without it, every layout's map item repaints from whatever is
     checked in the layer tree at export time - so toggling visibility to build
-    THIS sheet silently reshuffles every OTHER sheet's next export too.
+    THIS sheet silently reshuffles every OTHER sheet's next export too. Passing
+    an empty list locks the map to showing nothing, which is deliberate; a
+    name that doesn't match any project layer raises rather than silently
+    producing an incomplete map.
     """
     proj = QgsProject.instance()
     manager = proj.layoutManager()
@@ -122,10 +125,13 @@ def create_layout(name="Naksha map", title="", subtitle="", sources="", scale=50
     map_item.setScale(float(scale))  # fixed scale is the point; set it last
     map_item.setFrameEnabled(True)
     map_item.setFrameStrokeWidth(QgsLayoutMeasurement(0.3, MM))
-    if lock_layers:
+    if lock_layers is not None:
         locked = []
         for lname in lock_layers:
-            locked.extend(proj.mapLayersByName(lname))
+            found = proj.mapLayersByName(lname)
+            if not found:
+                raise ValueError(f"lock_layers: no layer named '{lname}' in the project")
+            locked.extend(found)
         map_item.setLayers(locked)
         map_item.setKeepLayerSet(True)
 
