@@ -73,12 +73,20 @@ def _label(layout, text, x, y, width, height, size, bold=False, colour="#1a1a1a"
 def create_layout(name="Naksha map", title="", subtitle="", sources="", scale=50000,
                   legend_layers=None, extent_layer="", width=420, height=297,
                   sources_below=True, scale_label=True, sources_size=9,
-                  footer_height=None, **_):
+                  footer_height=None, lock_layers=None, **_):
     """Build (or rebuild) a print layout and return a description of it.
 
     sources_below puts the source statement in a full-width band under the map,
     which is where a reader expects marginalia on a map sheet; set it False to
     keep the text in the side column beneath the legend.
+
+    lock_layers pins the map to an explicit layer list instead of following the
+    live canvas. Without it, every layout's map item repaints from whatever is
+    checked in the layer tree at export time - so toggling visibility to build
+    THIS sheet silently reshuffles every OTHER sheet's next export too. Passing
+    an empty list locks the map to showing nothing, which is deliberate; a
+    name that doesn't match any project layer raises rather than silently
+    producing an incomplete map.
     """
     proj = QgsProject.instance()
     manager = proj.layoutManager()
@@ -117,6 +125,15 @@ def create_layout(name="Naksha map", title="", subtitle="", sources="", scale=50
     map_item.setScale(float(scale))  # fixed scale is the point; set it last
     map_item.setFrameEnabled(True)
     map_item.setFrameStrokeWidth(QgsLayoutMeasurement(0.3, MM))
+    if lock_layers is not None:
+        locked = []
+        for lname in lock_layers:
+            found = proj.mapLayersByName(lname)
+            if not found:
+                raise ValueError(f"lock_layers: no layer named '{lname}' in the project")
+            locked.extend(found)
+        map_item.setLayers(locked)
+        map_item.setKeepLayerSet(True)
 
     # --- legend ------------------------------------------------------------
     legend = QgsLayoutItemLegend(layout)

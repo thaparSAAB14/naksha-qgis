@@ -294,6 +294,9 @@ TOOLS = {
                 "extent_layer": {"type": "string", "description": "layer to centre the map on"},
                 "width": {"type": "number", "description": "page width in mm (default 420 = A3)"},
                 "height": {"type": "number", "description": "page height in mm (default 297)"},
+                "lock_layers": {"type": "array", "items": _STR,
+                                "description": "layer names the map item is pinned to, "
+                                "independent of live canvas visibility"},
             },
         },
         "func": None,  # bound below, so importing layout.py stays lazy
