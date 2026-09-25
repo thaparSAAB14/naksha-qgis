@@ -130,11 +130,19 @@ def detect(bridge=None):
     # models() and reports what the endpoint actually answered.
     has_key = bool(api_key())
     found.append((cloud_id, label, has_key, "API key stored" if has_key else "no API key yet"))
-    if bridge is not None and getattr(bridge, "last_seen", 0):
-        idle = time.time() - bridge.last_seen
-        if idle < 300:
+    # The connected app answers through the chat relay (mailbox.py): the user types
+    # here, it reads with read_chat and answers with send_chat. Offered whenever the
+    # bridge is up — not only after a call has landed — because otherwise the source
+    # you want to pick only appears once something has already used it.
+    if bridge is not None:
+        seen = getattr(bridge, "last_seen", 0)
+        idle = time.time() - seen if seen else None
+        if idle is not None and idle < 300:
             who = bridge.client or "an MCP app"
-            found.append(("bridge", f"MCP · {who}", True, f"active {int(idle)}s ago"))
+            found.append(("bridge", f"Connected app · {who}", True, f"active {int(idle)}s ago"))
+        else:
+            found.append(("bridge", "Connected app", True,
+                          "bridge on — waiting for an app to call in"))
     return found
 
 

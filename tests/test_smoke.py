@@ -570,5 +570,60 @@ empty = tools.run_tool(
 )
 assert "WARNING: 0 features" in empty, empty
 
+# --- the chat relay: user types in the dock, a connected AI app answers there ---
+from naksha import mailbox  # noqa: E402
+
+mailbox.demo()  # the module's own round-trip self-check
+mailbox.reset()
+
+assert {"read_chat", "send_chat"} <= set(tools.TOOLS), "relay tools not registered"
+# they only touch the panel, so they must never hit the approval gate
+assert {"read_chat", "send_chat"} <= tools.READ_ONLY
+
+assert tools.run_tool("read_chat", {}) == "(no new messages)", "empty inbox must not block"
+mailbox.post_user("colour the roads by type")
+mailbox.post_user("then zoom to them")
+drained = tools.run_tool("read_chat", {})
+assert "colour the roads by type" in drained and "then zoom to them" in drained, drained
+assert tools.run_tool("read_chat", {}) == "(no new messages)", "messages replayed"
+
+# with no dock listening the answer is held, not lost
+assert "held" in tools.run_tool("send_chat", {"text": "done — 3 classes"})
+shown = []
+mailbox.subscribe(shown.append)
+assert shown == ["done — 3 classes"], shown
+assert tools.run_tool("send_chat", {"text": "and zoomed"}) == "shown in the Naksha panel"
+assert shown == ["done — 3 classes", "and zoomed"], shown
+assert tools.run_tool("send_chat", {"text": "   "}).startswith("error:"), "empty reply accepted"
+mailbox.reset()
+
+# the relay is reachable over MCP, which is the whole point
+srv3 = bridge.BridgeServer()
+relay_names = {t["name"] for t in
+               srv3.mcp({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})["result"]["tools"]}
+assert {"read_chat", "send_chat"} <= relay_names, relay_names
+mailbox.post_user("from the panel")
+got = srv3.mcp({"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                "params": {"name": "read_chat", "arguments": {}}})["result"]
+assert "from the panel" in got["content"][0]["text"], got
+assert got["isError"] is False
+
+# a live bridge is offered as a pickable source even before any client calls in,
+# otherwise the option only appears once you no longer need to go looking for it
+class _QuietBridge:
+    last_seen = 0.0
+    client = ""
+
+sources = {s[0]: s for s in provider.detect(_QuietBridge())}
+assert "bridge" in sources and sources["bridge"][2] is True, sources
+QgsSettings().setValue("naksha/provider", "bridge")
+assert provider.resolve(_QuietBridge())[0] == "bridge", "explicit choice of the app ignored"
+QgsSettings().setValue("naksha/provider", "")
+# but it is never auto-selected: a silent app would look like a hung Naksha
+provider.api_key = lambda: "sk-test"
+assert provider.resolve(_QuietBridge())[0] != "bridge", "relay must be opt-in"
+srv3.stop()
+mailbox.reset()
+
 app.exitQgis()
 print("smoke: all green")

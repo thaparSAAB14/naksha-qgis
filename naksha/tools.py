@@ -191,6 +191,28 @@ def reload_plugin(**_):
 # own Python Console.
 
 
+def read_chat(**_):
+    """Drain whatever the user typed into the Naksha panel since the last call."""
+    from . import mailbox
+
+    msgs = mailbox.take_user()
+    if not msgs:
+        return "(no new messages)"
+    return "\n".join(f"[{i + 1}] {m['text']}" for i, m in enumerate(msgs))
+
+
+def send_chat(text="", **_):
+    """Put an answer back in the panel so the user never leaves QGIS."""
+    from . import mailbox
+
+    text = str(text).strip()
+    if not text:
+        return "error: nothing to send — pass the reply as 'text'"
+    if mailbox.post_reply(text):
+        return "shown in the Naksha panel"
+    return "the Naksha panel is closed; held and shown when the user reopens it"
+
+
 _STR = {"type": "string"}
 TOOLS = {
     "project_state": {
@@ -297,6 +319,44 @@ TOOLS = {
                 "lock_layers": {"type": "array", "items": _STR,
                                 "description": "layer names the map item is pinned to, "
                                 "independent of live canvas visibility"},
+                "picture_path": {"type": "string", "description": "absolute path to an "
+                                 "image (PNG/SVG) to place in a full-width band below the "
+                                 "map - for a figure that isn't a georeferenced layer"},
+                "picture_height": {"type": "number", "description": "height of the picture "
+                                   "band in mm (default 100)"},
+                "elevation_lines_layer": {"type": "string", "description": "a line layer "
+                                          "already in the project, one feature per "
+                                          "cross-section - each gets a real native "
+                                          "elevation profile panel stacked below the map"},
+                "elevation_source_layers": {"type": "array", "items": _STR,
+                                            "description": "raster/mesh layer names to draw "
+                                            "elevation from in the profile panels"},
+                "elevation_panel_height": {"type": "number", "description": "height per "
+                                           "profile panel in mm (default 55)"},
+                "map_enabled": {"type": "boolean", "description": "set False for a sheet "
+                                "that is pure figure - no map, legend, scale bar or north "
+                                "arrow - giving that whole area to picture_path or the "
+                                "elevation panels instead (default True)"},
+                "chart_layers": {"type": "array", "items": _STR,
+                                 "description": "layer names to stack as plain map panels "
+                                 "with a coordinate grid (chart axes) - for data that is "
+                                 "itself an ordinary editable layer, e.g. a profile built "
+                                 "as real polygons in a distance/elevation space"},
+                "chart_panel_height": {"type": "number", "description": "height per chart "
+                                       "panel in mm (default 55)"},
+                "chart_x_max": {"type": "number", "description": "shared X-axis max across "
+                                "all chart panels (default: the largest layer extent)"},
+                "chart_y_max": {"type": "number", "description": "shared Y-axis max across "
+                                "all chart panels (default: the largest layer extent)"},
+                "chart_grid_x": {"type": "number", "description": "gridline spacing on X, "
+                                 "in layer coordinate units (default 2000)"},
+                "chart_grid_y": {"type": "number", "description": "gridline spacing on Y, "
+                                 "in layer coordinate units (default 1000)"},
+                "chart_vertical_exaggeration": {"type": "number", "description": "if the "
+                                                "chart layer's Y coordinate is elevation*N "
+                                                "(vertical exaggeration), pass N here to get "
+                                                "an honest caption with the true spacing "
+                                                "instead of a misleading raw axis label"},
             },
         },
         "func": None,  # bound below, so importing layout.py stays lazy
@@ -311,6 +371,29 @@ def _create_layout(**kwargs):
 
 
 TOOLS["create_layout"]["func"] = _create_layout
+
+# Appended rather than declared inline so project_state stays the first tool a model
+# sees — it is the one that orients it, and ordering is the only nudge we get.
+TOOLS["read_chat"] = {
+    "description": "Read what the user has typed into the Naksha chat panel inside QGIS and "
+    "not yet had answered. Returns '(no new messages)' when nothing is waiting — it never "
+    "blocks, so poll it every few seconds while you are working with this user. Reading a "
+    "message marks it delivered, so each one arrives once. Answer with send_chat rather than "
+    "in your own window: the point is that the user never has to switch away from QGIS.",
+    "parameters": {"type": "object", "properties": {}},
+    "func": read_chat,
+}
+TOOLS["send_chat"] = {
+    "description": "Show a message to the user in the Naksha chat panel inside QGIS. Use it "
+    "for every reply to something read_chat gave you, and for progress notes during long "
+    "jobs, so the user can follow along without leaving the map.",
+    "parameters": {
+        "type": "object",
+        "properties": {"text": {"type": "string", "description": "what the user should read"}},
+        "required": ["text"],
+    },
+    "func": send_chat,
+}
 
 
 def openai_tool_specs():
@@ -343,7 +426,10 @@ def _hint(err):
     return ""
 
 
-READ_ONLY = {"project_state", "search_algorithms", "describe_algorithm", "query_features"}
+# read_chat/send_chat touch the chat panel, never the project, so they are never
+# worth an approval prompt — gating them would stall the relay on every reply.
+READ_ONLY = {"project_state", "search_algorithms", "describe_algorithm", "query_features",
+             "read_chat", "send_chat"}
 
 
 def run_tool(name, args):
