@@ -4,24 +4,26 @@ import html
 import json
 
 from qgis.core import Qgis, QgsApplication, QgsMessageLog, QgsSettings
-from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtCore import Qt, QTimer
 from qgis.PyQt.QtGui import QIcon, QPalette
 from qgis.PyQt.QtWidgets import (
     QAction,
     QDockWidget,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMenu,
     QMessageBox,
     QPushButton,
-    QTextBrowser,
+    QScrollArea,
+    QSizePolicy,
     QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
-from . import ICON, bridge, connect, panels, provider, settings, tools
+from . import ICON, bridge, connect, mailbox, panels, provider, settings, tools
 from .task import AgentTask, MainThreadBridge
 
 
@@ -69,6 +71,7 @@ class NakshaPlugin:
         # plugin reload, which read as "the bridge keeps dying on its own".
         self.set_bridge(False, remember=False)
         if self.dock is not None:
+            mailbox.unsubscribe(self.dock._relay_reply)
             self.iface.removeDockWidget(self.dock)
             self.dock = None
         self.action = None
@@ -122,6 +125,86 @@ class NakshaPlugin:
         return True
 
 
+class Transcript(QScrollArea):
+    """The conversation, as real widgets rather than one HTML blob.
+
+    QTextBrowser was doing this with <table> bubbles, but Qt's rich text has no
+    border-radius and no way to align one message left and the next right, so
+    every message looked the same weight. Stacked QLabels style properly, keep
+    text selectable, and let a 'thinking' row be replaced in place.
+    """
+
+    def __init__(self, colors, parent=None):
+        super().__init__(parent)
+        self.c = colors
+        self.setWidgetResizable(True)
+        self.setFrameShape(QFrame.NoFrame)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._body = QWidget()
+        self._col = QVBoxLayout(self._body)
+        self._col.setContentsMargins(10, 10, 10, 10)
+        self._col.setSpacing(6)
+        self._col.addStretch(1)  # keeps rows pinned to the top when there are few
+        self.setWidget(self._body)
+        self._pending = None  # the live "working…" row, replaced when the answer lands
+
+    # --- rows ------------------------------------------------------------
+    def _row(self, widget, left, right):
+        """Asymmetric margins, not width maths: the indent is what separates
+        'you' from 'Naksha', and it survives any dock width without resize code."""
+        holder = QWidget()
+        lay = QHBoxLayout(holder)
+        lay.setContentsMargins(left, 0, right, 0)
+        lay.addWidget(widget)
+        self._col.insertWidget(self._col.count() - 1, holder)
+        self._scroll()
+        return holder
+
+    def bubble(self, sender, text, mine=False, extra_html=""):
+        body = html.escape(text).replace("\n", "<br>")
+        label = QLabel(
+            f'<div style="color:{self.c["dim"]};font-size:10px;'
+            f'letter-spacing:0.4px;">{html.escape(sender).upper()}</div>'
+            f'<div style="color:{self.c["text"]};">{body}{extra_html}</div>'
+        )
+        label.setWordWrap(True)
+        label.setTextFormat(Qt.RichText)
+        label.setOpenExternalLinks(True)
+        label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        fill = self.c["bubble_mine"] if mine else self.c["bubble"]
+        edge = self.c["accent"] if not mine else self.c["user"]
+        label.setStyleSheet(
+            f"QLabel {{ background:{fill}; border:1px solid {self.c['border']};"
+            f" border-left:3px solid {edge}; border-radius:10px; padding:9px 12px; }}"
+        )
+        return self._row(label, 34 if mine else 0, 0 if mine else 34)
+
+    def chip(self, text):
+        label = QLabel("· " + html.escape(text))
+        label.setStyleSheet(
+            f"QLabel {{ color:{self.c['muted']}; font-style:italic; padding:1px 6px; }}"
+        )
+        return self._row(label, 12, 12)
+
+    # --- the working indicator -------------------------------------------
+    def working(self, text):
+        """Show a single live status row, replacing whatever it last said."""
+        self.clear_working()
+        self._pending = self.chip(text)
+
+    def clear_working(self):
+        if self._pending is not None:
+            self._pending.setParent(None)
+            self._pending.deleteLater()
+            self._pending = None
+
+    def _scroll(self):
+        # after layout settles, not before, or maximum() is still the old value
+        QTimer.singleShot(0, lambda: self.verticalScrollBar().setValue(
+            self.verticalScrollBar().maximum()))
+
+
 class NakshaDock(QDockWidget):
     MODES = settings.MODES
 
@@ -141,6 +224,12 @@ class NakshaDock(QDockWidget):
             "bubble": "#233230" if dark else "#EDF5F3",
             "border": "#3A4A47" if dark else "#CFDEDB",
             "warn": "#D08F58" if dark else "#8F4E24",
+            # added for the widget transcript: its own text and surface tokens, so
+            # bubbles do not inherit whatever QGIS theme is underneath them
+            "text": "#E6EDEB" if dark else "#1B2A28",
+            "dim": "#8A9997" if dark else "#6B7A78",
+            "bubble_mine": "#1D2A38" if dark else "#EAF1F8",
+            "field": "#1B2523" if dark else "#FFFFFF",
         }
 
         self.status = QToolButton()
@@ -162,7 +251,7 @@ class NakshaDock(QDockWidget):
         head.addWidget(self.status)
         head.addWidget(gear)
 
-        self.transcript = QTextBrowser()
+        self.transcript = Transcript(self.c)
         self.input = QLineEdit()
         self.input.setPlaceholderText("Ask for any GIS job in plain language…")
         self.input.returnPressed.connect(self.send)
@@ -184,17 +273,25 @@ class NakshaDock(QDockWidget):
         col.addWidget(self.chat)
         self.body.setStyleSheet(
             f"""
-            QLineEdit {{ border: 1px solid {self.c['border']}; border-radius: 9px; padding: 7px 10px; }}
+            QLineEdit {{ background: {self.c['field']}; color: {self.c['text']};
+                         border: 1px solid {self.c['border']}; border-radius: 10px;
+                         padding: 8px 12px; selection-background-color: {self.c['accent']}; }}
             QLineEdit:focus {{ border-color: {self.c['accent']}; }}
+            QLineEdit:disabled {{ color: {self.c['muted']}; }}
             QPushButton {{ background: {self.c['accent']}; color: white; border: none;
-                           border-radius: 9px; padding: 7px 18px; font-weight: 600; }}
+                           border-radius: 10px; padding: 8px 18px; font-weight: 600; }}
             QPushButton:hover {{ background: {self.c['user']}; }}
-            QTextBrowser {{ border: 1px solid {self.c['border']}; border-radius: 9px; padding: 4px; }}
-            QToolButton {{ border-radius: 7px; padding: 3px 8px; }}
+            QPushButton:disabled {{ background: {self.c['border']}; color: {self.c['muted']}; }}
+            QScrollArea {{ background: transparent; border: 1px solid {self.c['border']};
+                           border-radius: 10px; }}
+            QToolButton {{ color: {self.c['text']}; border: 1px solid transparent;
+                           border-radius: 9px; padding: 3px 9px; }}
+            QToolButton:hover {{ border-color: {self.c['border']}; }}
             """
         )
         self.setWidget(self.body)
         self.welcome = None
+        mailbox.subscribe(self._relay_reply)  # answers from a connected AI app
         self.refresh_status()
 
         if str(QgsSettings().value("naksha/seen_welcome", "")).lower() != "true":
@@ -206,14 +303,22 @@ class NakshaDock(QDockWidget):
     def refresh_status(self):
         source_id, label, ready, detail = provider.resolve(self.plugin.bridge)
         dot = self.c["accent"] if ready else self.c["warn"]
-        model = provider.active_model()
+        # No model suffix for the connected app: active_model() resolves without
+        # the bridge and would fall back to the local/cloud default, captioning
+        # the header "Connected app · qwen2.5:7b" with a model that is not
+        # answering. Which model the other end uses is its business, not ours.
+        model = "" if source_id == "bridge" else provider.active_model()
         self.status.setText(f"● {label}" + (f" · {model}" if ready and model else ""))
-        self.status.setStyleSheet(f"color: {dot};")
+        self.status.setStyleSheet(
+            f"QToolButton {{ color:{dot}; background:{self.c['bubble']};"
+            f" border:1px solid {self.c['border']}; border-radius:9px; padding:3px 9px; }}"
+            f"QToolButton:hover {{ border-color:{dot}; }}"
+        )
         self.status.setToolTip(f"{label} — {detail}\nClick to change.")
         menu = QMenu(self.status)
         for sid, slabel, sready, sdetail in provider.detect(self.plugin.bridge):
             act = menu.addAction(f"{'✓' if sready else '·'}  {slabel} — {sdetail}")
-            act.setEnabled(sready and sid != "bridge")
+            act.setEnabled(sready)
             act.triggered.connect(lambda _=False, s=sid: self._pick(s))
         menu.addSeparator()
         menu.addAction("Settings…").triggered.connect(self.plugin.open_settings)
@@ -251,19 +356,13 @@ class NakshaDock(QDockWidget):
 
     # --- rendering -------------------------------------------------------
     def _bubble(self, sender, color, text, extra_html=""):
-        body = html.escape(text).replace("\n", "<br>")
-        self.transcript.append(
-            f'<table width="100%" cellpadding="7" style="margin-bottom:6px;">'
-            f'<tr><td bgcolor="{self.c["bubble"]}">'
-            f'<span style="color:{color}; font-weight:600;">{sender}</span><br>{body}{extra_html}'
-            f"</td></tr></table>"
-        )
-        self.transcript.verticalScrollBar().setValue(self.transcript.verticalScrollBar().maximum())
+        # `color` is kept for call-site compatibility; the transcript decides the
+        # accent now, from whether the message is the user's.
+        self.transcript.bubble(sender, text, mine=(color == self.c["user"]),
+                               extra_html=extra_html)
 
     def _chip(self, text):
-        self.transcript.append(
-            f'<p style="color:{self.c["muted"]}; font-style:italic; margin:2px 10px;">· {html.escape(text)}</p>'
-        )
+        self.transcript.chip(text)
 
     # --- the turn --------------------------------------------------------
     def send(self):
@@ -279,6 +378,15 @@ class NakshaDock(QDockWidget):
         self.history.append({"role": "user", "content": text})
         log(f"user: {text}")
 
+        # "Connected app" selected: hand the message to whatever MCP client is
+        # attached instead of running our own provider. It polls read_chat and
+        # answers with send_chat, which lands in _relay_reply below.
+        source, label = provider.resolve(self.plugin.bridge)[:2]
+        if source == "bridge":
+            mailbox.post_user(text)
+            self.transcript.working(f"sent to {label} — waiting for it to answer…")
+            return
+
         mode = str(provider.setting("mode", self.MODES[0]) or self.MODES[0])
         self.task = AgentTask(self.history, self._make_gate(mode), self.marshal)
         self.task.tool_started.connect(self._on_tool)
@@ -287,8 +395,28 @@ class NakshaDock(QDockWidget):
         self.btn.setText("Stop")
         QgsApplication.taskManager().addTask(self.task)
 
+    def _relay_reply(self, text):
+        """A connected AI app answered through send_chat."""
+        self.transcript.clear_working()
+        self._bubble("Naksha", self.c["accent"], text)
+        self.history.append({"role": "assistant", "content": text})
+        log(f"relay: {text}")
+
+    def showEvent(self, event):
+        # Closing a dock only hides it — QGIS keeps the widget and _toggle shows
+        # this same instance again. Without resubscribing here, one close killed
+        # the relay for the rest of the session: buffered replies never flushed
+        # and live ones stopped rendering. subscribe() is idempotent and drains
+        # whatever arrived while we were hidden.
+        mailbox.subscribe(self._relay_reply)
+        super().showEvent(event)
+
+    def closeEvent(self, event):  # hidden, not destroyed: showEvent resubscribes
+        mailbox.unsubscribe(self._relay_reply)
+        super().closeEvent(event)
+
     def _on_tool(self, name):
-        self._chip(f"running {name}…")
+        self.transcript.working(f"running {name}…")
         log(f"tool: {name}")
 
     def _finished(self, reply):
@@ -296,6 +424,7 @@ class NakshaDock(QDockWidget):
         self.btn.setText("Send")
         self.input.setEnabled(True)
         self.input.setFocus()
+        self.transcript.clear_working()
         self._bubble("Naksha", self.c["accent"], reply)
         log(f"naksha: {reply}")
         self.refresh_status()
