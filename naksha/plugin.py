@@ -303,7 +303,11 @@ class NakshaDock(QDockWidget):
     def refresh_status(self):
         source_id, label, ready, detail = provider.resolve(self.plugin.bridge)
         dot = self.c["accent"] if ready else self.c["warn"]
-        model = provider.active_model()
+        # No model suffix for the connected app: active_model() resolves without
+        # the bridge and would fall back to the local/cloud default, captioning
+        # the header "Connected app · qwen2.5:7b" with a model that is not
+        # answering. Which model the other end uses is its business, not ours.
+        model = "" if source_id == "bridge" else provider.active_model()
         self.status.setText(f"● {label}" + (f" · {model}" if ready and model else ""))
         self.status.setStyleSheet(
             f"QToolButton {{ color:{dot}; background:{self.c['bubble']};"
@@ -398,7 +402,16 @@ class NakshaDock(QDockWidget):
         self.history.append({"role": "assistant", "content": text})
         log(f"relay: {text}")
 
-    def closeEvent(self, event):  # stop writing into a dock that is going away
+    def showEvent(self, event):
+        # Closing a dock only hides it — QGIS keeps the widget and _toggle shows
+        # this same instance again. Without resubscribing here, one close killed
+        # the relay for the rest of the session: buffered replies never flushed
+        # and live ones stopped rendering. subscribe() is idempotent and drains
+        # whatever arrived while we were hidden.
+        mailbox.subscribe(self._relay_reply)
+        super().showEvent(event)
+
+    def closeEvent(self, event):  # hidden, not destroyed: showEvent resubscribes
         mailbox.unsubscribe(self._relay_reply)
         super().closeEvent(event)
 

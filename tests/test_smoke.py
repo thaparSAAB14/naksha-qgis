@@ -595,6 +595,18 @@ assert shown == ["done — 3 classes"], shown
 assert tools.run_tool("send_chat", {"text": "and zoomed"}) == "shown in the Naksha panel"
 assert shown == ["done — 3 classes", "and zoomed"], shown
 assert tools.run_tool("send_chat", {"text": "   "}).startswith("error:"), "empty reply accepted"
+
+# Closing the dock only hides it; QGIS shows the same widget again. Mirror that
+# cycle exactly — unsubscribe on close, subscribe on show — because getting it
+# wrong killed the relay for the rest of the session: one close and replies
+# stopped arriving for good.
+mailbox.unsubscribe(shown.append)          # closeEvent
+tools.run_tool("send_chat", {"text": "arrived while hidden"})
+assert shown[-1] != "arrived while hidden", "a hidden dock should not be written to"
+mailbox.subscribe(shown.append)            # showEvent on reopen
+assert shown[-1] == "arrived while hidden", "reopening did not flush buffered replies"
+assert tools.run_tool("send_chat", {"text": "live again"}) == "shown in the Naksha panel"
+assert shown[-1] == "live again", "relay stayed dead after a close/reopen cycle"
 mailbox.reset()
 
 # the relay is reachable over MCP, which is the whole point
