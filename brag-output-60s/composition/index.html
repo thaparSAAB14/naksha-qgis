@@ -1,0 +1,2095 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Naksha — the full tour</title>
+    <script src="assets/vendor/gsap.min.js"></script>
+    <script src="assets/audio-data.js"></script>
+    <style>
+      @font-face {
+        font-family: "Tiro Devanagari Hindi";
+        font-style: normal;
+        font-weight: 400;
+        src: url("assets/fonts/tiro-devanagari-hindi-naksha.woff2") format("woff2");
+      }
+      :root {
+        --void: #0c1211;
+        --bg: #1b2523;
+        --surface: #2b3634;
+        --bubble: #233230;
+        --bubble-mine: #1d2a38;
+        --border: #3a4a47;
+        --accent: #35b8a5;
+        --tile: #10695c;
+        --user: #7fb3e8;
+        --warn: #d08f58;
+        --text: #e6edeb;
+        --muted: #9aa5a3;
+        --paper: #f4f7f6;
+        --ink: #1a1a1a;
+        --sans: "Montserrat", sans-serif;
+        --mono: "IBM Plex Mono", monospace;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--void);
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--void);
+        font-family: var(--sans);
+        color: var(--text);
+      }
+      .abs {
+        position: absolute;
+      }
+
+      /* ---------- persistent backdrop ---------- */
+      #bg {
+        position: absolute;
+        inset: 0;
+        --bass: 0;
+      }
+      #contours {
+        position: absolute;
+        left: -120px;
+        top: -120px;
+        width: 2160px;
+        height: 1320px;
+      }
+      #contours path {
+        fill: none;
+        stroke: var(--accent);
+        stroke-width: 2;
+        stroke-opacity: 0.13;
+      }
+      .blob {
+        position: absolute;
+        border-radius: 50%;
+      }
+      .blob i {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        opacity: calc(0.5 + var(--bass) * 0.5);
+        transform: scale(calc(0.95 + var(--bass) * 0.1));
+      }
+      #blob-a {
+        left: 380px;
+        top: 120px;
+        width: 900px;
+        height: 900px;
+      }
+      #blob-a i {
+        background: radial-gradient(closest-side, rgba(53, 184, 165, 0.5), rgba(53, 184, 165, 0));
+      }
+      #blob-b {
+        left: 900px;
+        top: 260px;
+        width: 760px;
+        height: 760px;
+      }
+      #blob-b i {
+        background: radial-gradient(closest-side, rgba(127, 179, 232, 0.32), rgba(127, 179, 232, 0));
+      }
+
+      .glass {
+        background: rgba(27, 37, 35, 0.62);
+        backdrop-filter: blur(30px) saturate(150%);
+        border: 2px solid rgba(230, 237, 235, 0.14);
+        border-radius: 30px;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.12),
+          0 30px 90px rgba(0, 0, 0, 0.5);
+      }
+      .eyebrow {
+        font-family: var(--mono);
+        font-weight: 700;
+        font-size: 22px;
+        letter-spacing: 0.14em;
+        color: var(--accent);
+      }
+      .display {
+        font-weight: 900;
+        letter-spacing: -0.035em;
+        line-height: 1;
+        color: var(--text);
+      }
+      .display em {
+        font-style: normal;
+        color: var(--accent);
+      }
+      .hide {
+        opacity: 0;
+      }
+
+      /* ---------- scene 1: glass word + shatter ---------- */
+      #s1 {
+        width: 1920px;
+        height: 1080px;
+        perspective: 1600px;
+      }
+      .pane {
+        position: absolute;
+        left: 410px;
+        top: 250px;
+        width: 1100px;
+        height: 580px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .pane .deva {
+        font-family: "Tiro Devanagari Hindi", serif;
+        font-size: 230px;
+        line-height: 1;
+        color: var(--accent);
+      }
+      .pane .word {
+        margin-top: 10px;
+        font-weight: 900;
+        font-size: 84px;
+        letter-spacing: -0.03em;
+      }
+      .pane .gloss {
+        margin-top: 14px;
+        font-family: var(--mono);
+        font-size: 28px;
+        color: var(--muted);
+      }
+      #frags .pane {
+        opacity: 0;
+      }
+
+      /* ---------- the laptop ---------- */
+      #stage {
+        position: absolute;
+        inset: 0;
+        perspective: 2400px;
+      }
+      #camera {
+        position: absolute;
+        inset: 0;
+      }
+      #laptop {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+      }
+      #lid {
+        position: absolute;
+        left: 410px;
+        top: 230px;
+        width: 1100px;
+        height: 640px;
+        border-radius: 30px;
+        background: #070b0a;
+        box-shadow:
+          0 0 0 3px #3a4a47,
+          0 50px 140px rgba(0, 0, 0, 0.7);
+      }
+      #cam-dot {
+        position: absolute;
+        left: 546px;
+        top: 7px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #2b3634;
+      }
+      #screen-clip {
+        position: absolute;
+        left: 18px;
+        top: 18px;
+        width: 1064px;
+        height: 599px;
+        overflow: hidden;
+        border-radius: 8px;
+      }
+      #screen {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1920px;
+        height: 1080px;
+        transform: scale(0.55417);
+        transform-origin: 0 0;
+      }
+      #glare {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(115deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0) 38%);
+        pointer-events: none;
+      }
+      #base {
+        position: absolute;
+        left: 290px;
+        top: 868px;
+        width: 1340px;
+        height: 28px;
+        border-radius: 4px 4px 30px 30px;
+        background: linear-gradient(#b9c3c1, #6f7c79);
+      }
+      #base i {
+        position: absolute;
+        left: 580px;
+        top: 0;
+        width: 180px;
+        height: 9px;
+        border-radius: 0 0 10px 10px;
+        background: #55615f;
+      }
+
+      /* ---------- the QGIS screen (native 1920x1080) ---------- */
+      #ui {
+        position: absolute;
+        inset: 0;
+        background: var(--bg);
+      }
+      #map-panel {
+        position: absolute;
+        left: 24px;
+        top: 24px;
+        width: 1220px;
+        height: 1032px;
+        border: 2px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+        background: var(--bubble);
+      }
+      #map {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1216px;
+        height: 986px;
+      }
+      #map .terrain path {
+        fill: none;
+        stroke: var(--accent);
+        stroke-width: 2;
+        stroke-opacity: 0.12;
+      }
+      .road {
+        fill: none;
+        stroke: var(--border);
+        stroke-width: 6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .highway {
+        fill: none;
+        stroke: #5d6b68;
+        stroke-width: 10;
+        stroke-linecap: round;
+      }
+      #river {
+        fill: none;
+        stroke: var(--user);
+        stroke-opacity: 0.6;
+        stroke-width: 24;
+        stroke-linecap: round;
+      }
+      .pin {
+        fill: var(--text);
+        stroke: var(--bg);
+        stroke-width: 4;
+      }
+      .pulse {
+        fill: none;
+        stroke: var(--warn);
+        stroke-width: 4;
+        opacity: 0;
+      }
+      .map-tag {
+        position: absolute;
+        padding: 6px 14px;
+        border-radius: 10px;
+        background: var(--bg);
+        font-family: var(--mono);
+        font-weight: 700;
+        font-size: 20px;
+        white-space: nowrap;
+        opacity: 0;
+      }
+      #tag-bad {
+        left: 850px;
+        top: 250px;
+        color: var(--warn);
+        border: 2px solid var(--warn);
+      }
+      #tag-good {
+        left: 600px;
+        top: 590px;
+        color: var(--accent);
+        border: 2px solid var(--accent);
+      }
+      #layers {
+        position: absolute;
+        left: 16px;
+        top: 16px;
+        width: 340px;
+        padding: 12px 16px 10px;
+        border-radius: 12px;
+        border: 2px solid var(--border);
+        background: var(--bg);
+        font-family: var(--mono);
+        font-size: 19px;
+      }
+      #layers h4 {
+        font-size: 15px;
+        letter-spacing: 0.14em;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      .lrow {
+        display: flex;
+        align-items: center;
+        height: 31px;
+        gap: 10px;
+      }
+      .lrow b {
+        display: block;
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+        background: var(--accent);
+        flex: none;
+      }
+      .lrow span {
+        flex: 1;
+      }
+      .lrow em {
+        font-style: normal;
+        font-weight: 700;
+        color: var(--muted);
+      }
+      #statusbar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 40px;
+        padding: 0 24px;
+        background: var(--surface);
+        border-top: 2px solid var(--border);
+        font-family: var(--mono);
+        font-size: 18px;
+        color: var(--muted);
+      }
+      #statusbar strong {
+        color: var(--text);
+      }
+
+      #dock {
+        position: absolute;
+        left: 1268px;
+        top: 24px;
+        width: 628px;
+        height: 1032px;
+        border: 2px solid var(--border);
+        border-radius: 16px;
+        background: var(--surface);
+        padding: 18px 22px 22px;
+      }
+      #dock-head {
+        display: flex;
+        align-items: center;
+        height: 52px;
+        gap: 12px;
+      }
+      .ntile {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        background: var(--tile);
+        color: var(--text);
+        font-weight: 900;
+        font-size: 27px;
+        flex: none;
+      }
+      #dock-name {
+        font-weight: 700;
+        font-size: 26px;
+      }
+      .status-pill {
+        padding: 6px 14px;
+        border-radius: 12px;
+        border: 2px solid var(--border);
+        background: var(--bubble);
+        color: var(--accent);
+        font-weight: 700;
+        font-size: 17px;
+        white-space: nowrap;
+      }
+      #dock-head .status-pill {
+        margin-left: auto;
+      }
+      #gear {
+        font-size: 24px;
+        color: var(--muted);
+      }
+      #transcript {
+        position: relative;
+        margin-top: 14px;
+        height: 846px;
+        border: 2px solid var(--border);
+        border-radius: 14px;
+        overflow: hidden;
+      }
+      .grp {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .bubble {
+        position: relative;
+        width: 486px;
+        padding: 11px 18px 13px;
+        border-radius: 14px;
+        border: 2px solid var(--border);
+        border-left: 5px solid var(--accent);
+        background: var(--bubble);
+        font-weight: 500;
+        font-size: 21px;
+        line-height: 1.4;
+        text-wrap: balance;
+      }
+      .bubble.mine {
+        margin-left: auto;
+        background: var(--bubble-mine);
+        border-left-color: var(--user);
+      }
+      .who {
+        display: block;
+        font-weight: 700;
+        font-size: 15px;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+        margin-bottom: 3px;
+      }
+      .mono {
+        display: block;
+        font-family: var(--mono);
+        font-size: 19px;
+        line-height: 1.45;
+      }
+      .mono strong,
+      .plan b {
+        color: var(--accent);
+      }
+      .big {
+        display: block;
+        font-weight: 700;
+        font-size: 25px;
+        line-height: 1.3;
+      }
+      .big strong {
+        font-weight: 900;
+        color: var(--warn);
+      }
+      .foot {
+        display: block;
+        margin-top: 6px;
+        font-family: var(--mono);
+        font-size: 17px;
+        line-height: 1.45;
+        color: var(--muted);
+      }
+      .plan {
+        display: block;
+        font-family: var(--mono);
+        font-size: 19px;
+        line-height: 1.6;
+      }
+      .plan span {
+        display: block;
+        position: relative;
+        padding-left: 34px;
+      }
+      .plan span i,
+      .plan span u {
+        position: absolute;
+        left: 0;
+        top: 0;
+        font-style: normal;
+        text-decoration: none;
+      }
+      .plan span u {
+        color: var(--accent);
+        opacity: 0;
+      }
+      .slot {
+        position: relative;
+      }
+      .chip {
+        position: absolute;
+        left: 14px;
+        top: 4px;
+        font-style: italic;
+        font-weight: 500;
+        font-size: 20px;
+        color: var(--muted);
+        white-space: nowrap;
+        opacity: 0;
+      }
+      .chip.warn {
+        left: 0;
+        top: 0;
+        width: 520px;
+        padding: 8px 14px;
+        border: 2px solid var(--warn);
+        border-radius: 12px;
+        font-style: normal;
+        font-family: var(--mono);
+        font-weight: 700;
+        font-size: 19px;
+        line-height: 1.45;
+        white-space: normal;
+        color: var(--warn);
+      }
+      #input-row {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+        height: 64px;
+      }
+      #input {
+        position: relative;
+        flex: 1;
+        border: 2px solid var(--border);
+        border-radius: 14px;
+        background: var(--bg);
+        font-weight: 500;
+        font-size: 21px;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      #ph,
+      .typed {
+        position: absolute;
+        left: 18px;
+        top: 17px;
+      }
+      #ph {
+        color: var(--muted);
+      }
+      .typed span {
+        opacity: 0;
+      }
+      #send {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 112px;
+        border-radius: 14px;
+        background: var(--tile);
+        font-weight: 700;
+        font-size: 21px;
+      }
+
+      /* ---------- world overlays ---------- */
+      .caption {
+        position: absolute;
+        left: 60px;
+        top: 700px;
+        width: 760px;
+        padding: 34px 40px 36px;
+        opacity: 0;
+      }
+      .caption .display {
+        font-size: 84px;
+      }
+      .caption p {
+        margin-top: 14px;
+        font-family: var(--mono);
+        font-size: 26px;
+        color: var(--muted);
+      }
+      #cap-warn .display {
+        color: var(--warn);
+      }
+
+      #s2-title {
+        left: 0;
+        width: 1920px;
+        top: 70px;
+        text-align: center;
+        font-size: 84px;
+        opacity: 0;
+      }
+
+      /* print sheet */
+      #sheet {
+        left: 110px;
+        top: 150px;
+        width: 1000px;
+        height: 707px;
+        padding: 36px 40px;
+        border-radius: 10px;
+        background: var(--paper);
+        color: var(--ink);
+        box-shadow: 0 60px 140px rgba(0, 0, 0, 0.6);
+        opacity: 0;
+      }
+      #sheet h2 {
+        font-weight: 900;
+        font-size: 40px;
+        letter-spacing: -0.02em;
+      }
+      #sheet .sub {
+        margin-top: 2px;
+        font-family: var(--mono);
+        font-size: 18px;
+        color: #465350;
+      }
+      #sheet-map {
+        position: absolute;
+        left: 40px;
+        top: 140px;
+        width: 660px;
+        height: 470px;
+        border: 2px solid var(--ink);
+        overflow: hidden;
+        background: #e3ebe9;
+      }
+      #sheet-legend {
+        position: absolute;
+        left: 730px;
+        top: 140px;
+        width: 230px;
+        font-size: 19px;
+        opacity: 0;
+      }
+      #sheet-legend h5 {
+        font-weight: 700;
+        font-size: 20px;
+        margin-bottom: 10px;
+      }
+      .leg {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        height: 36px;
+      }
+      .leg b {
+        display: block;
+        width: 22px;
+        height: 22px;
+        flex: none;
+      }
+      #sheet-scale {
+        position: absolute;
+        left: 730px;
+        top: 420px;
+        width: 230px;
+        opacity: 0;
+      }
+      .sbar {
+        display: flex;
+        height: 12px;
+        border: 2px solid var(--ink);
+      }
+      .sbar i {
+        flex: 1;
+        background: var(--ink);
+      }
+      .sbar i:nth-child(2n) {
+        background: var(--paper);
+      }
+      .slab {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 6px;
+        font-family: var(--mono);
+        font-size: 16px;
+      }
+      #sheet-north {
+        position: absolute;
+        left: 860px;
+        top: 510px;
+        width: 70px;
+        height: 100px;
+        opacity: 0;
+      }
+      #sheet-foot {
+        position: absolute;
+        left: 40px;
+        bottom: 34px;
+        font-family: var(--mono);
+        font-size: 16px;
+        color: #465350;
+      }
+      #pdf-chip {
+        left: 1170px;
+        top: 780px;
+        padding: 18px 28px;
+        font-family: var(--mono);
+        font-size: 26px;
+        opacity: 0;
+      }
+      #pdf-chip strong {
+        color: var(--accent);
+      }
+
+      /* 715 */
+      #s6 .count {
+        position: absolute;
+        left: 150px;
+        top: 200px;
+        font-family: var(--mono);
+        font-weight: 700;
+        font-size: 360px;
+        line-height: 1;
+        letter-spacing: -0.04em;
+        color: var(--text);
+        opacity: 0;
+      }
+      #s6 .label {
+        position: absolute;
+        left: 160px;
+        top: 600px;
+        font-size: 58px;
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        opacity: 0;
+      }
+      #s6 .label em {
+        font-style: normal;
+        color: var(--accent);
+      }
+      #prov {
+        position: absolute;
+        left: 160px;
+        top: 720px;
+        display: flex;
+        gap: 18px;
+      }
+      .pchip {
+        padding: 14px 26px;
+        border-radius: 999px;
+        font-family: var(--mono);
+        font-weight: 700;
+        font-size: 28px;
+        opacity: 0;
+      }
+      #s6 .fine {
+        position: absolute;
+        left: 160px;
+        top: 840px;
+        font-family: var(--mono);
+        font-size: 24px;
+        color: var(--muted);
+        opacity: 0;
+      }
+      #algo-rain {
+        position: absolute;
+        left: 1420px;
+        top: 150px;
+        width: 440px;
+        height: 800px;
+        padding: 30px 34px;
+        font-family: var(--mono);
+        font-size: 22px;
+        line-height: 1.75;
+        color: var(--muted);
+        overflow: hidden;
+        opacity: 0;
+      }
+      #algo-list b {
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      /* modes */
+      .s-title {
+        position: absolute;
+        left: 110px;
+        top: 90px;
+        font-size: 96px;
+        opacity: 0;
+      }
+      .mode {
+        position: absolute;
+        top: 300px;
+        width: 540px;
+        height: 620px;
+        padding: 40px 38px;
+        opacity: 0;
+      }
+      .mode h3 {
+        font-weight: 900;
+        font-size: 46px;
+        letter-spacing: -0.02em;
+      }
+      .mode p {
+        margin-top: 12px;
+        font-size: 24px;
+        line-height: 1.4;
+        color: var(--muted);
+      }
+      .mode .tag {
+        display: inline-block;
+        margin-bottom: 22px;
+        padding: 6px 14px;
+        border-radius: 999px;
+        border: 2px solid var(--border);
+        font-family: var(--mono);
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--muted);
+      }
+      .mode .ring {
+        position: absolute;
+        inset: -4px;
+        border-radius: 32px;
+        border: 4px solid var(--accent);
+        opacity: 0;
+      }
+      .dialog {
+        margin-top: 28px;
+        padding: 20px 22px;
+        border-radius: 16px;
+        background: var(--surface);
+        border: 2px solid var(--border);
+      }
+      .dialog h4 {
+        font-size: 22px;
+        font-weight: 700;
+      }
+      .dialog pre {
+        margin-top: 10px;
+        font-family: var(--mono);
+        font-size: 18px;
+        line-height: 1.45;
+        color: var(--muted);
+        white-space: pre-wrap;
+      }
+      .dialog .btns {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 14px;
+      }
+      .btn {
+        padding: 8px 20px;
+        border-radius: 10px;
+        border: 2px solid var(--border);
+        font-weight: 700;
+        font-size: 20px;
+      }
+      .btn.primary {
+        background: var(--tile);
+        border-color: var(--tile);
+      }
+      .flow {
+        margin-top: 28px;
+        font-family: var(--mono);
+        font-size: 22px;
+        line-height: 1.9;
+      }
+      .flow span {
+        display: block;
+        opacity: 0;
+      }
+      .flow b {
+        color: var(--accent);
+      }
+      .lock {
+        margin-top: 28px;
+        padding: 18px 20px;
+        border-radius: 14px;
+        border: 2px solid var(--warn);
+        font-family: var(--mono);
+        font-size: 19px;
+        line-height: 1.45;
+        color: var(--warn);
+        opacity: 0;
+      }
+
+      /* AI sources */
+      .src {
+        position: absolute;
+        top: 300px;
+        width: 540px;
+        height: 660px;
+        padding: 38px 36px;
+        opacity: 0;
+      }
+      .src h3 {
+        font-weight: 900;
+        font-size: 44px;
+        letter-spacing: -0.02em;
+        line-height: 1.05;
+      }
+      .src .sub {
+        margin-top: 10px;
+        font-family: var(--mono);
+        font-size: 22px;
+        color: var(--accent);
+      }
+      .menu {
+        margin-top: 26px;
+        padding: 10px 0;
+        border-radius: 14px;
+        border: 2px solid var(--border);
+        background: var(--surface);
+        font-size: 19px;
+      }
+      .menu div {
+        padding: 9px 18px;
+        white-space: nowrap;
+      }
+      .menu .off {
+        color: var(--muted);
+      }
+      .menu hr {
+        border: 0;
+        border-top: 2px solid var(--border);
+        margin: 6px 0;
+      }
+      .field {
+        margin-top: 12px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        border: 2px solid var(--border);
+        background: var(--bg);
+        font-family: var(--mono);
+        font-size: 20px;
+      }
+      .field small {
+        display: block;
+        font-family: var(--sans);
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      .note {
+        margin-top: 14px;
+        font-size: 20px;
+        color: var(--muted);
+      }
+      .note b {
+        color: var(--accent);
+      }
+      .apps {
+        margin-top: 18px;
+      }
+      .app {
+        position: relative;
+        display: flex;
+        align-items: center;
+        height: 56px;
+        font-size: 22px;
+        font-weight: 500;
+        border-bottom: 2px solid rgba(58, 74, 71, 0.7);
+      }
+      .app span {
+        flex: 1;
+      }
+      .app .btn {
+        font-size: 18px;
+        padding: 5px 16px;
+      }
+      #cd-on {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        background: #1f2c2a;
+        opacity: 0;
+      }
+      #cd-on span {
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .toggle {
+        margin-top: 16px;
+        font-size: 19px;
+        color: var(--text);
+      }
+      .toggle b {
+        color: var(--accent);
+      }
+      #toast {
+        left: 1290px;
+        top: 975px;
+        width: 560px;
+        padding: 16px 22px;
+        font-size: 19px;
+        line-height: 1.4;
+        opacity: 0;
+      }
+      #cursor {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 40px;
+        height: 48px;
+        opacity: 0;
+      }
+
+      /* dev tools */
+      #devwin {
+        left: 700px;
+        top: 160px;
+        width: 1120px;
+        height: 780px;
+        padding: 0;
+        overflow: hidden;
+        opacity: 0;
+      }
+      #devwin .bar {
+        height: 64px;
+        display: flex;
+        align-items: center;
+        padding: 0 28px;
+        gap: 12px;
+        border-bottom: 2px solid var(--border);
+        font-weight: 700;
+        font-size: 22px;
+      }
+      #devwin .bar .dots {
+        display: flex;
+        gap: 8px;
+        margin-right: 12px;
+      }
+      #devwin .bar .dots i {
+        display: block;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--border);
+      }
+      .tabs {
+        display: flex;
+        gap: 6px;
+        padding: 16px 28px 0;
+      }
+      .tab {
+        position: relative;
+        padding: 10px 20px;
+        font-size: 21px;
+        font-weight: 700;
+        color: var(--muted);
+      }
+      .tab .on {
+        position: absolute;
+        inset: 0;
+        border-radius: 12px 12px 0 0;
+        background: var(--surface);
+        border: 2px solid var(--border);
+        border-bottom: 0;
+        opacity: 0;
+      }
+      .tab span {
+        position: relative;
+      }
+      .pane-dev {
+        position: absolute;
+        left: 28px;
+        right: 28px;
+        top: 130px;
+        bottom: 28px;
+        padding: 24px 28px;
+        border-radius: 0 14px 14px 14px;
+        background: var(--surface);
+        border: 2px solid var(--border);
+        font-family: var(--mono);
+        font-size: 20px;
+        line-height: 1.55;
+        opacity: 0;
+      }
+      .pane-dev .k {
+        color: var(--user);
+      }
+      .pane-dev .s {
+        color: var(--accent);
+      }
+      table.timing {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 21px;
+      }
+      table.timing th {
+        text-align: left;
+        color: var(--muted);
+        padding: 8px 10px;
+        border-bottom: 2px solid var(--border);
+      }
+      table.timing td {
+        padding: 12px 10px;
+        border-bottom: 2px solid rgba(58, 74, 71, 0.6);
+      }
+      .hl {
+        position: absolute;
+        top: 24px;
+        bottom: 24px;
+        border-radius: 10px;
+        border: 3px solid var(--accent);
+        opacity: 0;
+      }
+      .tree span {
+        display: block;
+      }
+      .tree .c {
+        padding-left: 34px;
+        color: var(--muted);
+      }
+
+      /* security slams */
+      .slam {
+        position: absolute;
+        left: 0;
+        width: 1920px;
+        text-align: center;
+        font-size: 190px;
+        opacity: 0;
+      }
+      #sec-fine {
+        position: absolute;
+        left: 0;
+        width: 1920px;
+        top: 860px;
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 28px;
+        color: var(--muted);
+        opacity: 0;
+      }
+
+      /* lockup */
+      #tile {
+        position: absolute;
+        left: 200px;
+        top: 342px;
+        width: 200px;
+        height: 200px;
+        border-radius: 34px;
+        background: var(--tile);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        font-size: 150px;
+        opacity: 0;
+      }
+      #lock-text {
+        position: absolute;
+        left: 452px;
+        top: 322px;
+        width: 1400px;
+      }
+      #wordrow {
+        display: flex;
+        align-items: flex-end;
+        gap: 40px;
+        height: 170px;
+      }
+      #wordmark {
+        font-weight: 900;
+        font-size: 160px;
+        line-height: 0.95;
+        letter-spacing: -0.04em;
+        opacity: 0;
+      }
+      #deva-block {
+        display: flex;
+        flex-direction: column;
+        padding-bottom: 14px;
+        opacity: 0;
+      }
+      #deva-block .d {
+        font-family: "Tiro Devanagari Hindi", serif;
+        font-size: 96px;
+        line-height: 1;
+        color: var(--accent);
+      }
+      #deva-block .n {
+        margin-top: 4px;
+        font-family: var(--mono);
+        font-size: 22px;
+        color: #a4aeac;
+      }
+      #tagline {
+        margin-top: 30px;
+        font-size: 52px;
+        opacity: 0;
+      }
+      #url {
+        margin-top: 22px;
+        font-family: var(--mono);
+        font-size: 26px;
+        color: var(--muted);
+        opacity: 0;
+      }
+      #url strong {
+        color: var(--text);
+      }
+      #works {
+        margin-top: 44px;
+        font-family: var(--mono);
+        font-size: 22px;
+        color: var(--muted);
+        opacity: 0;
+      }
+      #works b {
+        color: var(--accent);
+      }
+
+      /* persistent progress: a cartographic scale bar */
+      #progress {
+        position: absolute;
+        left: 40px;
+        top: 1016px;
+        width: 520px;
+        height: 48px;
+        padding: 10px 18px;
+        border-radius: 14px;
+        background: rgba(12, 18, 17, 0.82);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        font-family: var(--mono);
+        font-size: 17px;
+        color: var(--muted);
+        opacity: 0;
+      }
+      #pbar {
+        position: relative;
+        width: 250px;
+        height: 10px;
+        display: flex;
+        border: 2px solid var(--muted);
+      }
+      #pbar i {
+        flex: 1;
+      }
+      #pbar i:nth-child(2n + 1) {
+        background: var(--muted);
+      }
+      #pmark {
+        position: absolute;
+        left: -7px;
+        top: -8px;
+        width: 14px;
+        height: 22px;
+        border-radius: 4px;
+        background: var(--accent);
+      }
+      #pch {
+        position: relative;
+        flex: 1;
+        height: 22px;
+        color: var(--text);
+      }
+      #pch span {
+        position: absolute;
+        left: 0;
+        top: 0;
+        white-space: nowrap;
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="60" data-width="1920" data-height="1080">
+      <div id="bg">
+        <svg id="contours" viewBox="0 0 2160 1320" aria-hidden="true" data-layout-ignore></svg>
+        <div class="blob" id="blob-a"><i></i></div>
+        <div class="blob" id="blob-b"><i></i></div>
+      </div>
+
+      <!-- S1 0-4.6: the word, in glass, then it shatters -->
+      <section id="s1" class="clip" data-start="0" data-duration="4.8" data-track-index="1">
+        <div class="pane glass" id="pane-main">
+          <div class="deva">नक्शा</div>
+          <div class="word hide" id="w-naksha">Naksha</div>
+          <div class="gloss hide" id="w-gloss">Hindi · noun · map</div>
+        </div>
+        <div id="frags"></div>
+      </section>
+
+      <!-- S2-S5 2.4-30: the laptop -->
+      <section id="stage" class="clip" data-start="4.2" data-duration="26" data-track-index="2">
+        <div class="display abs" id="s2-title">Lives inside <em>QGIS.</em></div>
+        <div id="camera">
+          <div id="laptop">
+            <div id="lid">
+              <div id="cam-dot"></div>
+              <div id="screen-clip">
+                <div id="screen">
+                  <div id="ui">
+                    <div id="map-panel">
+                      <svg id="map" viewBox="-55 -151 1216 986" aria-hidden="true">
+                        <defs>
+                          <pattern id="hatch" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                            <rect width="18" height="18" fill="#7fb3e8" fill-opacity="0.14"></rect>
+                            <rect width="5" height="18" fill="#7fb3e8" fill-opacity="0.5"></rect>
+                          </pattern>
+                        </defs>
+                        <g id="mapzoom">
+                          <g class="terrain" id="terrain" data-layout-allow-overflow></g>
+                          <path class="road" id="rd1" d="M -200 300 L 400 330 L 700 250 L 1300 300" />
+                          <path class="road" id="rd2" d="M 250 -200 L 300 250 L 230 900" />
+                          <path class="road" id="rd3" d="M 850 -200 L 820 300 L 900 900" />
+                          <path class="road" id="rd4" d="M -200 600 L 500 640 L 1300 590" />
+                          <path class="road" id="rd5" d="M 450 900 L 520 500 L 460 150 L 520 -200" />
+                          <path class="highway" id="hw1" d="M -200 470 C 250 440, 420 380, 560 420 S 850 520, 1300 470" />
+                          <path class="highway" id="hw2" d="M 640 -200 C 620 200, 700 420, 640 900" />
+                          <path id="river" data-layout-allow-overflow d="M -300 160 C -100 150, 0 140, 50 138 C 200 120, 300 330, 520 330 S 800 250, 900 420 S 1050 600, 1300 640" />
+                          <g id="flood" opacity="0" data-layout-allow-overflow>
+                            <path fill="none" stroke="url(#hatch)" stroke-width="150" stroke-linecap="round" d="M -300 160 C -100 150, 0 140, 50 138 C 200 120, 300 330, 520 330 S 800 250, 900 420 S 1050 600, 1300 640" />
+                          </g>
+                          <g id="pulses"></g>
+                          <g id="pins"></g>
+                        </g>
+                      </svg>
+                      <div class="map-tag" id="tag-bad">flood_zones · EPSG:4326</div>
+                      <div class="map-tag" id="tag-good">flood_zones · EPSG:32643</div>
+                      <div id="layers" data-layout-allow-overlap>
+                        <h4>LAYERS</h4>
+                        <div class="lrow"><b></b><span>schools</span><em>14</em></div>
+                        <div class="lrow"><b></b><span>roads</span><em></em></div>
+                        <div class="lrow hide" id="lr-flood"><b></b><span>flood_zones</span><em></em></div>
+                        <div class="lrow hide" id="lr-ext"><b></b><span>extract_output</span><em id="ext-n">0</em></div>
+                      </div>
+                      <div id="statusbar">
+                        <span>Scale 1:25,000</span>
+                        <span>CRS <strong>EPSG:32643</strong></span>
+                      </div>
+                    </div>
+
+                    <aside id="dock">
+                      <div id="dock-head">
+                        <div class="ntile">N</div>
+                        <div id="dock-name">Naksha</div>
+                        <div class="status-pill">● Ollama (local, free) · qwen2.5:7b</div>
+                        <div id="gear">⚙</div>
+                      </div>
+                      <div id="transcript">
+                        <div class="grp" id="grpA">
+                          <div class="bubble">
+                            <span class="who">NAKSHA</span>
+                            Namaste! Tell me what you need and I'll do the GIS work — I check my own results, and nothing is written without your OK.
+                          </div>
+                          <div class="bubble mine hide" id="yA1"><span class="who">YOU</span>colour roads by highway</div>
+                          <div class="bubble hide" id="aA1"><span class="who">NAKSHA</span><span class="mono">styled 'roads' (categorized, by highway)</span></div>
+                          <div class="bubble mine hide" id="yA2"><span class="who">YOU</span>zoom to schools</div>
+                          <div class="bubble hide" id="aA2"><span class="who">NAKSHA</span><span class="mono">zoomed to 'schools'</span></div>
+                          <div class="bubble mine hide" id="yA3"><span class="who">YOU</span>how many features in schools</div>
+                          <div class="bubble hide" id="aA3"><span class="who">NAKSHA</span><span class="mono"><strong>14 features</strong> match on 'schools'</span></div>
+                        </div>
+                        <div class="grp hide" id="grpB">
+                          <div class="bubble mine hide" id="yB"><span class="who">YOU</span>find flood-exposed schools and map them</div>
+                          <div class="bubble hide" id="plan">
+                            <span class="who">NAKSHA · PLAN</span>
+                            <span class="plan">
+                              <span><i id="p1o">1.</i><u id="p1k">✓</u>find the right algorithm</span>
+                              <span><i id="p2o">2.</i><u id="p2k">✓</u>extract schools in flood_zones</span>
+                              <span><i id="p3o">3.</i><u id="p3k">✓</u>verify the output</span>
+                              <span><i id="p4o">4.</i><u id="p4k">✓</u>build a print layout</span>
+                            </span>
+                          </div>
+                          <div class="slot">
+                            <div class="chip" id="cB1">· running search_algorithms…</div>
+                            <div class="chip" id="cB2">· running native:extractbylocation…</div>
+                            <div class="chip warn" id="cB3">WARNING: 0 features — verify inputs (CRS mismatch? wrong filter?)</div>
+                            <div class="chip" id="cB4">· running native:reprojectlayer…</div>
+                            <div class="bubble hide" id="aB">
+                              <span class="who">NAKSHA</span>
+                              <span class="big"><strong>4 of 14</strong> schools are in the flood zone.</span>
+                              <span class="foot">1st pass: 0 features (CRS mismatch). Reprojected flood_zones to EPSG:32643 and re-ran.</span>
+                            </div>
+                          </div>
+                          <div class="slot">
+                            <div class="chip" id="cB5">· running create_layout…</div>
+                            <div class="bubble hide" id="aB2">
+                              <span class="who">NAKSHA</span>
+                              <span class="mono">exported layout 'Flood-exposed schools' to <strong>flood_schools.pdf</strong></span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div id="input-row">
+                        <div id="input">
+                          <span id="ph">Ask for any GIS job in plain language…</span>
+                          <span class="typed" id="t1">colour roads by highway</span>
+                          <span class="typed" id="t2">zoom to schools</span>
+                          <span class="typed" id="t3">how many features in schools</span>
+                          <span class="typed" id="t4">find flood-exposed schools and map them</span>
+                        </div>
+                        <div id="send">Send</div>
+                      </div>
+                    </aside>
+                  </div>
+                </div>
+                <div id="glare"></div>
+              </div>
+            </div>
+            <div id="base"><i></i></div>
+          </div>
+        </div>
+
+        <div class="caption glass" id="cap-instant">
+          <div class="display">Instant.</div>
+          <p>offline · no key · no model</p>
+        </div>
+        <div class="caption glass" id="cap-plan">
+          <div class="display">Plans. Runs. <em>Checks.</em></div>
+          <p>search → run → verify</p>
+        </div>
+        <div class="caption glass" id="cap-warn">
+          <div class="display">0 features ≠ done.</div>
+          <p>flagged, diagnosed, fixed</p>
+        </div>
+
+        <div class="abs" id="sheet" data-layout-allow-overlap>
+          <h2>Flood-exposed schools</h2>
+          <div class="sub">4 of 14 schools inside the 100-year flood zone</div>
+          <div id="sheet-map">
+            <svg viewBox="-20 60 1160 826" width="660" height="470" aria-hidden="true">
+              <path d="M -300 160 C -100 150, 0 140, 50 138 C 200 120, 300 330, 520 330 S 800 250, 900 420 S 1050 600, 1300 640" fill="none" stroke="#7fb3e8" stroke-opacity="0.55" stroke-width="150" stroke-linecap="round" />
+              <path d="M -300 160 C -100 150, 0 140, 50 138 C 200 120, 300 330, 520 330 S 800 250, 900 420 S 1050 600, 1300 640" fill="none" stroke="#33608c" stroke-width="22" stroke-linecap="round" />
+              <path d="M -200 470 C 250 440, 420 380, 560 420 S 850 520, 1300 470" fill="none" stroke="#9aa5a3" stroke-width="10" />
+              <path d="M 640 -200 C 620 200, 700 420, 640 900" fill="none" stroke="#9aa5a3" stroke-width="10" />
+              <g id="sheet-pins"></g>
+            </svg>
+          </div>
+          <div id="sheet-legend">
+            <h5>Legend</h5>
+            <div class="leg"><b style="background: #8f4e24; border-radius: 50%"></b>exposed school</div>
+            <div class="leg"><b style="background: #ffffff; border: 3px solid #1a1a1a; border-radius: 50%"></b>school</div>
+            <div class="leg"><b style="background: #a9c6e6"></b>flood zone</div>
+            <div class="leg"><b style="background: #33608c; height: 8px"></b>river</div>
+          </div>
+          <div id="sheet-scale">
+            <div class="sbar"><i></i><i></i><i></i><i></i></div>
+            <div class="slab"><span>0</span><span>500</span><span>1000 m</span></div>
+          </div>
+          <svg id="sheet-north" viewBox="0 0 70 100" aria-hidden="true">
+            <path d="M35 8 L58 78 L35 64 L12 78 Z" fill="#1a1a1a" />
+            <text x="35" y="98" text-anchor="middle" font-family="Montserrat" font-weight="900" font-size="22" fill="#1a1a1a">N</text>
+          </svg>
+          <div id="sheet-foot">Source: demo data · EPSG:32643 · 1:25,000</div>
+        </div>
+        <div class="abs glass" id="pdf-chip">→ <strong>flood_schools.pdf</strong></div>
+      </section>
+
+      <!-- S6 29.4-33.2: 715 -->
+      <section id="s6" class="clip" data-start="29.4" data-duration="3.8" data-track-index="3">
+        <div class="count" id="count">0</div>
+        <div class="label">Processing algorithms, <em>discovered live.</em></div>
+        <div id="prov">
+          <div class="pchip glass">native</div>
+          <div class="pchip glass">gdal</div>
+          <div class="pchip glass">grass</div>
+          <div class="pchip glass">pdal</div>
+          <div class="pchip glass">+ your plugins</div>
+        </div>
+        <div class="fine">715 on the developer's machine. Your count depends on your providers.</div>
+        <div id="algo-rain" class="glass">
+          <div id="algo-list">
+            <div><b>native</b>:buffer</div>
+            <div><b>native</b>:extractbylocation</div>
+            <div><b>native</b>:reprojectlayer</div>
+            <div><b>native</b>:dissolve</div>
+            <div><b>native</b>:clip</div>
+            <div><b>gdal</b>:warpreproject</div>
+            <div><b>gdal</b>:hillshade</div>
+            <div><b>gdal</b>:contour</div>
+            <div><b>grass7</b>:r.watershed</div>
+            <div><b>grass7</b>:v.net.path</div>
+            <div><b>native</b>:joinattributesbylocation</div>
+            <div><b>native</b>:heatmapkerneldensityestimation</div>
+            <div><b>gdal</b>:rastercalculator</div>
+            <div><b>native</b>:voronoipolygons</div>
+            <div><b>native</b>:zonalstatisticsfb</div>
+            <div><b>grass7</b>:r.slope.aspect</div>
+            <div><b>pdal</b>:exportrastertin</div>
+            <div><b>native</b>:shortestpathpointtopoint</div>
+            <div><b>native</b>:centroids</div>
+            <div><b>gdal</b>:cliprasterbymasklayer</div>
+            <div><b>native</b>:fieldcalculator</div>
+            <div><b>native</b>:mergevectorlayers</div>
+            <div><b>grass7</b>:v.buffer</div>
+            <div><b>native</b>:countpointsinpolygon</div>
+            <div><b>native</b>:linetopolygon</div>
+            <div><b>gdal</b>:slope</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- S7 33.0-38.4: approval modes -->
+      <section id="s7" class="clip" data-start="33" data-duration="5.5" data-track-index="4">
+        <div class="display s-title" id="m-title">You <em>decide.</em></div>
+        <div class="mode glass" id="m1" style="left: 110px">
+          <div class="ring" id="m1r"></div>
+          <div class="tag">DEFAULT</div>
+          <h3>Ask before writing</h3>
+          <p>Reads freely. Every write waits for your OK.</p>
+          <div class="dialog">
+            <h4>Naksha wants to run a tool</h4>
+            <pre>run_algorithm
+{ "algorithm_id": "native:buffer",
+  "parameters": { "DISTANCE": 500 } }</pre>
+            <div class="btns"><div class="btn">No</div><div class="btn primary" id="yes-btn">Yes</div></div>
+          </div>
+        </div>
+        <div class="mode glass" id="m2" style="left: 690px">
+          <div class="ring" id="m2r"></div>
+          <div class="tag">HANDS-OFF</div>
+          <h3>Autonomous</h3>
+          <p>Plans, runs and verifies end to end.</p>
+          <div class="flow">
+            <span><b>✓</b> search_algorithms</span>
+            <span><b>✓</b> describe_algorithm</span>
+            <span><b>✓</b> run_algorithm</span>
+            <span><b>✓</b> query_features</span>
+            <span><b>✓</b> create_layout</span>
+          </div>
+        </div>
+        <div class="mode glass" id="m3" style="left: 1270px">
+          <div class="ring" id="m3r"></div>
+          <div class="tag">SAFE</div>
+          <h3>Read-only</h3>
+          <p>Looks, counts and answers. Never writes.</p>
+          <div class="lock" id="ro-lock">error: read-only mode is on — the user must switch modes to allow writes</div>
+        </div>
+      </section>
+
+      <!-- S8 38.3-46.5: choose an AI -->
+      <section id="s8" class="clip" data-start="38.3" data-duration="8.2" data-track-index="5">
+        <div class="display s-title" id="b-title">Bring your own <em>brain.</em></div>
+        <div class="src glass" id="src1" style="left: 110px">
+          <h3>Local Ollama</h3>
+          <div class="sub">free · fully offline</div>
+          <div class="menu">
+            <div>✓&nbsp; Ollama (local, free) — qwen2.5:7b</div>
+            <div class="off">·&nbsp; OpenRouter — no API key yet</div>
+            <div>✓&nbsp; Connected app · Claude Desktop</div>
+            <hr />
+            <div>Settings…</div>
+          </div>
+          <div class="note">Detected automatically, shown in the dock header.</div>
+        </div>
+        <div class="src glass" id="src2" style="left: 690px">
+          <h3>An API key</h3>
+          <div class="sub">OpenRouter · Groq · OpenAI · Anthropic · custom</div>
+          <div class="field"><small>PROVIDER</small>OpenRouter</div>
+          <div class="field"><small>API KEY</small>••••••••••••••••••••</div>
+          <div class="field"><small>MODEL</small>from the endpoint's catalogue</div>
+          <div class="note"><b>Stored encrypted</b> in QGIS's auth store.</div>
+        </div>
+        <div class="src glass" id="src3" style="left: 1270px">
+          <h3>The app you already pay for</h3>
+          <div class="sub">MCP · one click</div>
+          <div class="toggle"><b>☑</b> Allow connected apps to control this QGIS session</div>
+          <div class="apps">
+            <div class="app" id="app-cd"><span>Claude Desktop</span><div class="btn primary" id="cd-btn">Connect</div>
+              <div id="cd-on"><span style="flex: 1">✓&nbsp; Claude Desktop</span><div class="btn">Disconnect</div></div>
+            </div>
+            <div class="app"><span>Claude Code</span><div class="btn">Connect</div></div>
+            <div class="app"><span>Cursor</span><div class="btn">Connect</div></div>
+            <div class="app"><span>Windsurf</span><div class="btn">Connect</div></div>
+            <div class="app"><span>VS Code</span><div class="btn">Connect</div></div>
+          </div>
+          <div class="note">or <b>Build Claude connector (.mcpb)…</b></div>
+        </div>
+        <div class="abs glass" id="toast">Connected to Claude Desktop. Restart Claude Desktop to pick it up.</div>
+      </section>
+
+      <!-- S9 46.4-50.6: developer tools -->
+      <section id="s9" class="clip" data-start="46.4" data-duration="4.3" data-track-index="6">
+        <div class="display s-title" id="d-title" style="font-size: 88px; width: 600px; top: 170px">Every request. Every <em>token.</em></div>
+        <div class="abs glass" id="devwin">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div>Naksha developer tools — v0.4.0</div>
+          <div class="tabs">
+            <div class="tab"><div class="on" id="tab1"></div><span>Raw traffic</span></div>
+            <div class="tab"><div class="on" id="tab2"></div><span>Timing</span></div>
+            <div class="tab"><div class="on" id="tab3"></div><span>Catalogue</span></div>
+            <div class="tab"><div class="on" id="tab4"></div><span>Diagnostics</span></div>
+          </div>
+          <div class="pane-dev" id="pd1">
+            <div>1. find flood-exposed schools and map them</div>
+            <div>{ <span class="k">"role"</span>: <span class="s">"assistant"</span>,</div>
+            <div>&nbsp; <span class="k">"tool_calls"</span>: [{</div>
+            <div>&nbsp;&nbsp;&nbsp; <span class="k">"name"</span>: <span class="s">"run_algorithm"</span>,</div>
+            <div>&nbsp;&nbsp;&nbsp; <span class="k">"arguments"</span>: { <span class="k">"algorithm_id"</span>:</div>
+            <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="s">"native:extractbylocation"</span> } }],</div>
+            <div>&nbsp; <span class="k">"usage"</span>: { <span class="k">"total_tokens"</span>: 3184 } }</div>
+          </div>
+          <div class="pane-dev" id="pd2">
+            <table class="timing">
+              <tr><th>Path</th><th>Time</th><th>Calls</th><th>Tools</th><th>Tokens</th></tr>
+              <tr><td>ai</td><td>9.4s</td><td>6</td><td>search_algorithms, run_algorithm…</td><td>3184</td></tr>
+              <tr><td>instant</td><td>0.02s</td><td>1</td><td>query_features</td><td>—</td></tr>
+              <tr><td>instant</td><td>0.03s</td><td>1</td><td>zoom_to</td><td>—</td></tr>
+              <tr><td>instant</td><td>0.05s</td><td>1</td><td>style_layer</td><td>—</td></tr>
+            </table>
+            <div class="hl" id="hl-time" style="left: 150px; width: 120px"></div>
+            <div class="hl" id="hl-tok" style="left: 880px; width: 120px"></div>
+          </div>
+          <div class="pane-dev tree" id="pd3">
+            <span>native:buffer — Buffer</span>
+            <span class="c">INPUT · source</span>
+            <span class="c">DISTANCE · distance</span>
+            <span class="c">OUTPUT · sink</span>
+            <span>native:extractbylocation — Extract by location</span>
+            <span class="c">INPUT · source</span>
+            <span class="c">INTERSECT · source</span>
+            <span>native:reprojectlayer — Reproject layer</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- S10 50.5-53.4: no exec -->
+      <section id="s10" class="clip" data-start="50.5" data-duration="3" data-track-index="7">
+        <div class="display slam" id="sl1" style="top: 170px">No exec.</div>
+        <div class="display slam" id="sl2" style="top: 390px">No eval.</div>
+        <div class="display slam" id="sl3" style="top: 610px"><em>Just GIS.</em></div>
+        <div id="sec-fine">0 bandit findings · 0 secrets · ruff clean · no subprocesses · no telemetry</div>
+      </section>
+
+      <!-- S11 53.3-60: lockup -->
+      <section id="s11" class="clip" data-start="53.3" data-duration="6.7" data-track-index="8">
+        <div id="tile">N</div>
+        <div id="lock-text">
+          <div id="wordrow">
+            <div id="wordmark">Naksha</div>
+            <div id="deva-block"><div class="d">नक्शा</div><div class="n">Hindi for “map”</div></div>
+          </div>
+          <div id="tagline">Free, open source, for QGIS.</div>
+          <div id="url"><strong>github.com/thaparSAAB14/naksha-qgis</strong> · GPL-2.0 · QGIS 3.40+</div>
+          <div id="works">works with <b>Ollama</b> · <b>any API key</b> · <b>Claude Desktop</b> · <b>Claude Code</b> · <b>Cursor</b> · <b>Windsurf</b> · <b>VS Code</b></div>
+        </div>
+      </section>
+
+      <!-- cursor + progress sit above every scene -->
+      <svg id="cursor" viewBox="0 0 40 48" aria-hidden="true">
+        <path d="M4 3 L4 38 L13 30 L19 44 L25 41 L19 28 L31 28 Z" fill="#e6edeb" stroke="#0c1211" stroke-width="3" stroke-linejoin="round" />
+      </svg>
+      <div id="progress">
+        <div id="pbar"><i></i><i></i><i></i><i></i><i></i><i></i><div id="pmark"></div></div>
+        <div id="pch">
+          <span id="ch1">01 · meet</span>
+          <span id="ch2">02 · instant</span>
+          <span id="ch3">03 · verified</span>
+          <span id="ch4">04 · print</span>
+          <span id="ch5">05 · algorithms</span>
+          <span id="ch6">06 · modes</span>
+          <span id="ch7">07 · any AI</span>
+          <span id="ch8">08 · dev tools</span>
+          <span id="ch9">09 · safe</span>
+          <span id="ch10">10 · naksha</span>
+        </div>
+      </div>
+
+      <!-- audio: music bed, narration, accents -->
+      <audio id="bg-music" src="assets/music/happy-beats-business-moves-vol-1-by-ende-dot-app.mp3" data-start="0" data-duration="60" data-track-index="10" data-volume="1"
+        data-automation='{"version":1,"lanes":[{"target":"volume","points":[{"t":0,"v":0.05},{"t":1.2,"v":0.16},{"t":58.4,"v":0.16},{"t":60,"v":0}]}]}'></audio>
+      <audio id="vo-01" src="assets/vo/vo-01.wav" data-start="1.0" data-duration="1.96" data-track-index="20" data-volume="1"></audio>
+      <audio id="vo-02" src="assets/vo/vo-02.wav" data-start="5.0" data-duration="4.18" data-track-index="20" data-volume="1"></audio>
+      <audio id="vo-03" src="assets/vo/vo-03.wav" data-start="10.2" data-duration="4.37" data-track-index="20" data-volume="1"></audio>
+      <audio id="vo-04" src="assets/vo/vo-04.wav" data-start="15.3" data-duration="5.10" data-track-index="20" data-volume="1"></audio>
+      <audio id="vo-05" src="assets/vo/vo-05.wav" data-start="20.8" data-duration="4.14" data-track-index="20" data-volume="1"></audio>
+      <audio id="vo-06" src="assets/vo/vo-06.wav" data-start="25.5" data-duration="3.58" data-track-index="20" data-volume="1"></audio>
+      <audio id="vo-07" src="assets/vo/vo-07.wav" data-start="29.6" data-duration="3.11" data-track-index="20" data-volume="1"></audio>
+      <audio id="vo-08" src="assets/vo/vo-08.wav" data-start="33.2" data-duration="4.80" data-track-index="20" data-volume="1"></audio>
+      <audio id="vo-09" src="assets/vo/vo-09.wav" data-start="38.5" data-duration="7.74" data-track-index="20" data-volume="1"></audio>
+      <audio id="vo-10" src="assets/vo/vo-10.wav" data-start="46.6" data-duration="3.71" data-track-index="20" data-volume="1"></audio>
+      <audio id="vo-11" src="assets/vo/vo-11.wav" data-start="50.7" data-duration="2.13" data-track-index="20" data-volume="1"></audio>
+      <audio id="vo-12" src="assets/vo/vo-12.wav" data-start="54.3" data-duration="2.88" data-track-index="20" data-volume="1"></audio>
+
+      <audio id="sx-shatter" src="assets/sfx/impactGlass_heavy_002.ogg" data-start="3.58" data-duration="1.2" data-track-index="11" data-volume="0.55"></audio>
+      <audio id="sx-rise" src="assets/sfx/impactSoft_heavy_001.ogg" data-start="4.6" data-duration="0.6" data-track-index="12" data-volume="0.5"></audio>
+      <audio id="sx-push" src="assets/sfx/card-slide-1.ogg" data-start="8.9" data-duration="0.6" data-track-index="11" data-volume="0.45"></audio>
+      <audio id="sx-k1" src="assets/sfx/keypress-001.wav" data-start="10.30" data-duration="0.25" data-track-index="13" data-volume="0.3"></audio>
+      <audio id="sx-k2" src="assets/sfx/keypress-005.wav" data-start="10.52" data-duration="0.25" data-track-index="14" data-volume="0.3"></audio>
+      <audio id="sx-k3" src="assets/sfx/keypress-003.wav" data-start="10.74" data-duration="0.25" data-track-index="13" data-volume="0.3"></audio>
+      <audio id="sx-c1" src="assets/sfx/click2.ogg" data-start="11.0" data-duration="0.08" data-track-index="15" data-volume="0.6"></audio>
+      <audio id="sx-k4" src="assets/sfx/keypress-007.wav" data-start="11.85" data-duration="0.25" data-track-index="13" data-volume="0.3"></audio>
+      <audio id="sx-c2" src="assets/sfx/click2.ogg" data-start="12.3" data-duration="0.08" data-track-index="15" data-volume="0.6"></audio>
+      <audio id="sx-k5" src="assets/sfx/keypress-001.wav" data-start="13.05" data-duration="0.25" data-track-index="13" data-volume="0.3"></audio>
+      <audio id="sx-k6" src="assets/sfx/keypress-005.wav" data-start="13.35" data-duration="0.25" data-track-index="14" data-volume="0.3"></audio>
+      <audio id="sx-c3" src="assets/sfx/click2.ogg" data-start="13.7" data-duration="0.08" data-track-index="15" data-volume="0.6"></audio>
+      <audio id="sx-c4" src="assets/sfx/click2.ogg" data-start="16.0" data-duration="0.08" data-track-index="15" data-volume="0.6"></audio>
+      <audio id="sx-plan" src="assets/sfx/drop_001.ogg" data-start="16.6" data-duration="0.12" data-track-index="16" data-volume="0.6"></audio>
+      <audio id="sx-warn" src="assets/sfx/impactSoft_medium_002.ogg" data-start="20.8" data-duration="0.14" data-track-index="16" data-volume="0.7"></audio>
+      <audio id="sx-snap" src="assets/sfx/impactSoft_medium_001.ogg" data-start="24.0" data-duration="0.19" data-track-index="16" data-volume="0.7"></audio>
+      <audio id="sx-pay" src="assets/sfx/bong_001.ogg" data-start="24.5" data-duration="0.13" data-track-index="17" data-volume="0.8"></audio>
+      <audio id="sx-sheet" src="assets/sfx/card-slide-1.ogg" data-start="26.0" data-duration="0.6" data-track-index="11" data-volume="0.5"></audio>
+      <audio id="sx-pdf" src="assets/sfx/drop_002.ogg" data-start="28.6" data-duration="0.12" data-track-index="16" data-volume="0.6"></audio>
+      <audio id="sx-count" src="assets/sfx/chips-stack-1.ogg" data-start="29.7" data-duration="0.8" data-track-index="12" data-volume="0.45"></audio>
+      <audio id="sx-715" src="assets/sfx/impactSoft_medium_003.ogg" data-start="31.3" data-duration="0.15" data-track-index="16" data-volume="0.7"></audio>
+      <audio id="sx-yes" src="assets/sfx/mouseclick1.ogg" data-start="35.9" data-duration="0.15" data-track-index="15" data-volume="0.6"></audio>
+      <audio id="sx-auto" src="assets/sfx/switch_002.ogg" data-start="36.4" data-duration="0.2" data-track-index="16" data-volume="0.5"></audio>
+      <audio id="sx-ro" src="assets/sfx/impactSoft_medium_002.ogg" data-start="37.2" data-duration="0.14" data-track-index="17" data-volume="0.6"></audio>
+      <audio id="sx-conn" src="assets/sfx/mouseclick1.ogg" data-start="44.9" data-duration="0.15" data-track-index="15" data-volume="0.6"></audio>
+      <audio id="sx-ok" src="assets/sfx/impactGlass_light_001.ogg" data-start="45.1" data-duration="0.5" data-track-index="16" data-volume="0.45"></audio>
+      <audio id="sx-tab1" src="assets/sfx/click2.ogg" data-start="48.2" data-duration="0.08" data-track-index="15" data-volume="0.5"></audio>
+      <audio id="sx-tab2" src="assets/sfx/click2.ogg" data-start="49.7" data-duration="0.08" data-track-index="15" data-volume="0.5"></audio>
+      <audio id="sx-s1" src="assets/sfx/impactPlate_light_000.ogg" data-start="50.7" data-duration="0.3" data-track-index="16" data-volume="0.5"></audio>
+      <audio id="sx-s2" src="assets/sfx/impactPlate_light_000.ogg" data-start="51.4" data-duration="0.3" data-track-index="17" data-volume="0.5"></audio>
+      <audio id="sx-s3" src="assets/sfx/impactSoft_medium_001.ogg" data-start="52.1" data-duration="0.19" data-track-index="16" data-volume="0.7"></audio>
+      <audio id="sx-logo" src="assets/sfx/impactBell_heavy_000.ogg" data-start="54.0" data-duration="1.48" data-track-index="18" data-volume="0.4"></audio>
+    </div>
+
+    <script>
+      (function () {
+        const NS = "http://www.w3.org/2000/svg";
+        const el = (tag, attrs, parent) => {
+          const node = document.createElementNS(NS, tag);
+          for (const k in attrs) node.setAttribute(k, attrs[k]);
+          parent.appendChild(node);
+          return node;
+        };
+        function mulberry32(a) {
+          return function () {
+            a |= 0;
+            a = (a + 0x6d2b79f5) | 0;
+            let t = Math.imul(a ^ (a >>> 15), 1 | a);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+        const rnd = mulberry32(42);
+
+        function ring(cx, cy, r, k, ax, ay) {
+          const pts = [];
+          for (let i = 0; i <= 96; i++) {
+            const t = (i / 96) * Math.PI * 2;
+            const w = 1 + 0.07 * Math.sin(3 * t + k * 0.7) + 0.04 * Math.sin(5 * t + k * 1.3);
+            pts.push((cx + Math.cos(t) * r * w * ax).toFixed(1) + " " + (cy + Math.sin(t) * r * w * ay).toFixed(1));
+          }
+          return "M " + pts.join(" L ") + " Z";
+        }
+        const contours = document.getElementById("contours");
+        for (let k = 1; k <= 11; k++) el("path", { d: ring(1640, 1020, 95 * k, k, 1.25, 0.9) }, contours);
+        for (let k = 1; k <= 8; k++) el("path", { d: ring(260, 180, 85 * k, k + 4, 1.1, 0.8) }, contours);
+        const terrain = document.getElementById("terrain");
+        for (let k = 1; k <= 6; k++) el("path", { d: ring(560, 560, 70 * k, k, 1.3, 0.7) }, terrain);
+        for (let k = 1; k <= 4; k++) el("path", { d: ring(980, 120, 60 * k, k + 2, 1.2, 0.8) }, terrain);
+
+        const schools = [
+          [250, 270], [520, 300], [770, 350], [1000, 530],
+          [130, 420], [330, 520], [180, 610], [600, 560], [420, 90],
+          [620, 110], [740, 190], [820, 620], [1040, 330], [930, 630],
+        ];
+        const pulses = document.getElementById("pulses");
+        const pins = document.getElementById("pins");
+        const sheetPins = document.getElementById("sheet-pins");
+        schools.forEach(([x, y], i) => {
+          if (i < 4) el("circle", { class: "pulse", id: "pulse-" + i, cx: x, cy: y, r: 16 }, pulses);
+          el("circle", { class: "pin" + (i < 4 ? " exposed" : ""), cx: x, cy: y, r: 11 }, pins);
+          el("circle", { cx: x, cy: y, r: 14, fill: i < 4 ? "#8f4e24" : "#ffffff", stroke: "#1a1a1a", "stroke-width": 4 }, sheetPins);
+        });
+
+        // typed commands: one span per character
+        ["t1", "t2", "t3", "t4"].forEach((id) => {
+          const node = document.getElementById(id);
+          const text = node.textContent;
+          node.textContent = "";
+          for (const ch of text) {
+            const s = document.createElement("span");
+            s.textContent = ch === " " ? " " : ch;
+            node.appendChild(s);
+          }
+        });
+
+        // glass shatter: jittered grid cut into clip-path fragments
+        const frags = document.getElementById("frags");
+        const main = document.getElementById("pane-main");
+        const cols = 5;
+        const rows = 3;
+        const gx = [];
+        for (let r = 0; r <= rows; r++) {
+          gx.push([]);
+          for (let c = 0; c <= cols; c++) {
+            const jx = c === 0 || c === cols ? 0 : (rnd() - 0.5) * 12;
+            const jy = r === 0 || r === rows ? 0 : (rnd() - 0.5) * 18;
+            gx[r].push([(c / cols) * 100 + jx, (r / rows) * 100 + jy]);
+          }
+        }
+        const fragEls = [];
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const p = [gx[r][c], gx[r][c + 1], gx[r + 1][c + 1], gx[r + 1][c]];
+            const f = main.cloneNode(true);
+            f.removeAttribute("id");
+            f.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
+            f.querySelectorAll(".hide").forEach((n) => n.classList.remove("hide"));
+            f.style.clipPath = "polygon(" + p.map((q) => q[0].toFixed(1) + "% " + q[1].toFixed(1) + "%").join(",") + ")";
+            const cx = (p[0][0] + p[2][0]) / 2;
+            const cy = (p[0][1] + p[2][1]) / 2;
+            f.dataset.dx = ((cx - 50) * 16 + (rnd() - 0.5) * 200).toFixed(0);
+            f.dataset.dy = ((cy - 50) * 12 + (rnd() - 0.5) * 160).toFixed(0);
+            f.dataset.rz = ((rnd() - 0.5) * 70).toFixed(0);
+            f.dataset.rx = ((rnd() - 0.5) * 120).toFixed(0);
+            f.dataset.ry = ((rnd() - 0.5) * 120).toFixed(0);
+            f.dataset.z = (200 + rnd() * 500).toFixed(0);
+            frags.appendChild(f);
+            fragEls.push(f);
+          }
+        }
+
+        function build() {
+          const tl = gsap.timeline({ paused: true });
+          const E = "power3.out";
+
+          tl.fromTo("#contours", { x: 0, rotation: 0 }, { x: -80, rotation: 2, duration: 60, ease: "none" }, 0);
+          tl.fromTo("#blob-a", { x: 0, y: 0 }, { x: 420, y: -80, duration: 60, ease: "sine.inOut" }, 0);
+          tl.fromTo("#blob-b", { x: 0, y: 0 }, { x: -500, y: 60, duration: 60, ease: "sine.inOut" }, 0);
+
+          // progress bar + chapters
+          tl.fromTo("#progress", { opacity: 0 }, { opacity: 1, duration: 0.6 }, 0.4);
+          tl.fromTo("#pmark", { x: 0 }, { x: 250, duration: 60, ease: "none" }, 0);
+          const chapters = [0, 10, 15, 25.3, 29.4, 33, 38.3, 46.4, 50.5, 53.3, 60];
+          chapters.slice(0, -1).forEach((t, i) => {
+            const id = "#ch" + (i + 1);
+            tl.fromTo(id, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.3, immediateRender: false }, t + 0.1);
+            if (i < chapters.length - 2) tl.to(id, { opacity: 0, y: -8, duration: 0.2 }, chapters[i + 1] - 0.1);
+          });
+
+          // ---- S1: the word ----
+          tl.fromTo("#pane-main", { opacity: 0, scale: 0.92, y: 30 }, { opacity: 1, scale: 1, y: 0, duration: 0.8, ease: "expo.out" }, 0.1);
+          tl.fromTo("#w-naksha", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.45, ease: E }, 1.25);
+          tl.fromTo("#w-gloss", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.4, ease: E }, 2.2);
+          tl.set("#pane-main", { opacity: 0 }, 3.6);
+          fragEls.forEach((f) => {
+            tl.set(f, { opacity: 1 }, 3.6);
+            tl.to(f, {
+              x: +f.dataset.dx, y: +f.dataset.dy, z: +f.dataset.z,
+              rotationZ: +f.dataset.rz, rotationX: +f.dataset.rx, rotationY: +f.dataset.ry,
+              opacity: 0, duration: 1.05, ease: "power2.out",
+            }, 3.6);
+          });
+
+          // ---- S2: laptop rises ----
+          tl.fromTo("#laptop", { opacity: 0, y: 260, rotationX: 24, transformOrigin: "50% 100%" }, { opacity: 1, y: 0, rotationX: 0, duration: 1.2, ease: "expo.out" }, 4.4);
+          tl.fromTo("#screen", { opacity: 0 }, { opacity: 1, duration: 0.6 }, 5.0);
+          tl.fromTo("#s2-title", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: E }, 5.2);
+          tl.to("#s2-title", { opacity: 0, y: -40, duration: 0.4, ease: "power2.in" }, 8.7);
+          // push into the screen
+          tl.fromTo("#camera", { scale: 1, y: 0, transformOrigin: "960px 547px" }, { scale: 1.805, y: -7, duration: 1.2, ease: "power3.inOut" }, 8.8);
+
+          // ---- S3: instant ----
+          function type(id, t0, step) {
+            const spans = document.getElementById(id).children;
+            tl.set("#ph", { opacity: 0 }, t0 - 0.02);
+            Array.from(spans).forEach((s, i) => tl.set(s, { opacity: 1 }, t0 + i * step));
+          }
+          function send(id, at) {
+            tl.to("#send", { scale: 0.93, duration: 0.07 }, at - 0.07);
+            tl.to("#send", { scale: 1, duration: 0.18 }, at);
+            tl.set("#" + id, { opacity: 0 }, at + 0.05);
+            tl.set("#ph", { opacity: 1 }, at + 0.05);
+          }
+          function pop(sel, at) {
+            tl.fromTo(sel, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.3, ease: E }, at);
+          }
+          tl.fromTo("#cap-instant", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.5, ease: E }, 10.3);
+          type("t1", 10.3, 0.026);
+          send("t1", 11.0);
+          pop("#yA1", 11.05);
+          const cats = { "#hw1": "#35b8a5", "#hw2": "#35b8a5", "#rd1": "#7fb3e8", "#rd4": "#7fb3e8", "#rd2": "#d08f58", "#rd3": "#d08f58", "#rd5": "#9aa5a3" };
+          Object.keys(cats).forEach((k, i) => tl.to(k, { stroke: cats[k], duration: 0.3 }, 11.3 + i * 0.04));
+          pop("#aA1", 11.35);
+          type("t2", 11.8, 0.026);
+          send("t2", 12.3);
+          pop("#yA2", 12.35);
+          tl.fromTo("#mapzoom", { scale: 1, svgOrigin: "560 360" }, { scale: 1.12, duration: 0.8, ease: "power3.inOut" }, 12.45);
+          pop("#aA2", 12.6);
+          type("t3", 13.0, 0.022);
+          send("t3", 13.7);
+          pop("#yA3", 13.75);
+          tl.to(".pin", { scale: 1.5, transformOrigin: "50% 50%", duration: 0.2, ease: "power2.out" }, 13.95);
+          tl.to(".pin", { scale: 1, transformOrigin: "50% 50%", duration: 0.3, ease: "power2.in" }, 14.2);
+          pop("#aA3", 13.95);
+          tl.to("#cap-instant", { opacity: 0, y: 30, duration: 0.3 }, 14.8);
+
+          // ---- S4: complex task ----
+          tl.to("#grpA", { y: -120, opacity: 0, duration: 0.45, ease: "power2.inOut" }, 15.0);
+          tl.set("#grpB", { opacity: 1 }, 15.3);
+          tl.to("#mapzoom", { scale: 1, duration: 0.8, ease: "power3.inOut" }, 15.0);
+          tl.fromTo("#cap-plan", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.5, ease: E }, 15.4);
+          type("t4", 15.2, 0.018);
+          send("t4", 16.0);
+          pop("#yB", 16.02); // beat-locked: 16.02
+          pop("#plan", 16.6);
+          tl.to("#cB1", { opacity: 1, duration: 0.2 }, 17.0);
+          tl.to("#p1o", { opacity: 0, duration: 0.15 }, 17.7);
+          tl.to("#p1k", { opacity: 1, duration: 0.2 }, 17.7);
+          tl.to("#cB1", { opacity: 0, duration: 0.15 }, 18.2);
+          tl.to("#cB2", { opacity: 1, duration: 0.2 }, 18.3);
+          tl.set("#flood", { x: 800, y: 20, scale: 0.26, svgOrigin: "0 0" }, 0);
+          tl.to("#flood", { opacity: 1, duration: 0.5 }, 18.5);
+          tl.fromTo("#tag-bad", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.3 }, 18.6);
+          pop("#lr-flood", 18.5);
+          tl.to("#cap-plan", { opacity: 0, y: 30, duration: 0.3 }, 20.4);
+          tl.to("#cB2", { opacity: 0, duration: 0.15 }, 20.6);
+          tl.fromTo("#cB3", { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.3, ease: E }, 20.8);
+          pop("#lr-ext", 20.8);
+          tl.fromTo("#cap-warn", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.45, ease: E }, 20.9);
+          tl.to("#cB3", { opacity: 0, duration: 0.2 }, 22.8);
+          tl.to("#cB4", { opacity: 1, duration: 0.2 }, 22.9);
+          tl.to("#tag-bad", { opacity: 0, duration: 0.2 }, 23.0);
+          tl.to("#flood", { x: 0, y: 0, scale: 1, duration: 1.0, ease: "power3.inOut" }, 23.02); // beat-locked landing: 24.02
+          tl.fromTo("#tag-good", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.3 }, 24.1);
+          tl.to("#cB4", { opacity: 0, duration: 0.15 }, 24.35);
+          pop("#aB", 24.5);
+          tl.to(".pin.exposed", { fill: "#d08f58", duration: 0.3 }, 24.5);
+          for (let i = 0; i < 4; i++) {
+            tl.fromTo("#pulse-" + i, { opacity: 0.95, scale: 1, transformOrigin: "50% 50%" }, { opacity: 0, scale: 2.8, duration: 1.1, ease: "power2.out", immediateRender: false }, 24.5);
+          }
+          tl.set("#ext-n", { textContent: "4" }, 24.5);
+          ["2", "3"].forEach((n, i) => {
+            tl.to("#p" + n + "o", { opacity: 0, duration: 0.15 }, 24.6 + i * 0.2);
+            tl.to("#p" + n + "k", { opacity: 1, duration: 0.2 }, 24.6 + i * 0.2);
+          });
+          tl.to("#cap-warn", { opacity: 0, y: 30, duration: 0.3 }, 25.2);
+
+          // ---- S5: print layout ----
+          tl.to("#camera", { scale: 1.3, y: 60, duration: 1.0, ease: "power3.inOut" }, 25.3);
+          tl.to("#cB5", { opacity: 1, duration: 0.2 }, 25.5);
+          tl.to("#layers", { opacity: 0, duration: 0.3 }, 25.9);
+          tl.fromTo("#sheet", { opacity: 0, x: 380, y: 140, scale: 0.35, rotationY: -28, rotationX: 10 }, { opacity: 1, x: 0, y: 0, scale: 1, rotationY: -6, rotationX: 2, duration: 1.0, ease: "expo.out" }, 26.0);
+          tl.fromTo("#sheet-legend", { opacity: 0, x: 20 }, { opacity: 1, x: 0, duration: 0.35, ease: E }, 26.9);
+          tl.fromTo("#sheet-scale", { opacity: 0, x: 20 }, { opacity: 1, x: 0, duration: 0.35, ease: E }, 27.6);
+          tl.fromTo("#sheet-north", { opacity: 0, rotation: -40 }, { opacity: 1, rotation: 0, duration: 0.45, ease: "back.out(1.6)" }, 28.3);
+          tl.to("#cB5", { opacity: 0, duration: 0.15 }, 28.45);
+          pop("#aB2", 28.6);
+          tl.to("#p4o", { opacity: 0, duration: 0.15 }, 28.6);
+          tl.to("#p4k", { opacity: 1, duration: 0.2 }, 28.6);
+          tl.fromTo("#pdf-chip", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.4, ease: E }, 28.6);
+          // exit the laptop world
+          tl.to("#camera", { scale: 0.7, opacity: 0, duration: 0.7, ease: "power2.in" }, 29.2);
+          tl.to("#sheet", { x: -900, rotationY: 20, opacity: 0, duration: 0.6, ease: "power2.in" }, 29.2);
+          tl.to("#pdf-chip", { opacity: 0, duration: 0.3 }, 29.2);
+
+          // ---- S6: 715 ----
+          tl.fromTo("#count", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.4, ease: E }, 29.5);
+          const steps = 48;
+          for (let i = 0; i <= steps; i++) {
+            const p = 1 - Math.pow(1 - i / steps, 3);
+            tl.set("#count", { textContent: String(Math.round(715 * p)) }, 29.6 + i * (1.6 / steps));
+          }
+          tl.fromTo("#count", { scale: 1 }, { scale: 1.04, duration: 0.12, yoyo: true, repeat: 1, transformOrigin: "0% 100%", immediateRender: false }, 31.25);
+          tl.fromTo("#s6 .label", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.45, ease: E }, 30.4);
+          tl.fromTo("#prov .pchip", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.35, ease: E, stagger: 0.12 }, 31.0);
+          tl.fromTo("#s6 .fine", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 31.7);
+          tl.fromTo("#algo-rain", { opacity: 0, x: 60 }, { opacity: 1, x: 0, duration: 0.5, ease: E }, 29.6);
+          tl.fromTo("#algo-list", { y: 0 }, { y: -380, duration: 3.6, ease: "none" }, 29.6);
+          tl.to("#s6 > *", { opacity: 0, duration: 0.3 }, 32.9);
+
+          // ---- S7: modes ----
+          tl.fromTo("#m-title", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: E }, 33.2);
+          ["#m1", "#m2", "#m3"].forEach((m, i) => {
+            tl.fromTo(m, { opacity: 0, y: 70 }, { opacity: 1, y: 0, duration: 0.6, ease: "expo.out" }, 33.6 + i * 0.15);
+          });
+          tl.fromTo("#m1r", { opacity: 0 }, { opacity: 1, duration: 0.25 }, 35.3);
+          tl.fromTo("#m1", { scale: 1 }, { scale: 1.03, duration: 0.3, ease: E, immediateRender: false }, 35.3);
+          tl.fromTo("#cursor", { opacity: 0, x: 560, y: 900 }, { opacity: 1, x: 520, y: 800, duration: 0.5, ease: E }, 35.35);
+          tl.to("#yes-btn", { scale: 0.92, duration: 0.07 }, 35.85);
+          tl.to("#yes-btn", { scale: 1, duration: 0.18 }, 35.92);
+          tl.to("#m1r", { opacity: 0, duration: 0.25 }, 36.3);
+          tl.to("#m1", { scale: 1, duration: 0.3 }, 36.3);
+          tl.to("#cursor", { opacity: 0, duration: 0.2 }, 36.2);
+          tl.fromTo("#m2r", { opacity: 0 }, { opacity: 1, duration: 0.25 }, 36.4);
+          tl.fromTo("#m2", { scale: 1 }, { scale: 1.03, duration: 0.3, ease: E, immediateRender: false }, 36.4);
+          tl.fromTo("#m2 .flow span", { opacity: 0, x: -14 }, { opacity: 1, x: 0, duration: 0.2, stagger: 0.12, ease: E }, 36.45);
+          tl.to("#m2r", { opacity: 0, duration: 0.25 }, 37.15);
+          tl.to("#m2", { scale: 1, duration: 0.3 }, 37.15);
+          tl.fromTo("#m3r", { opacity: 0 }, { opacity: 1, duration: 0.25 }, 37.25);
+          tl.fromTo("#m3", { scale: 1 }, { scale: 1.03, duration: 0.3, ease: E, immediateRender: false }, 37.25);
+          tl.fromTo("#ro-lock", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.3 }, 37.3);
+          tl.to("#s7 > *", { opacity: 0, duration: 0.3 }, 38.1);
+
+          // ---- S8: any AI ----
+          tl.fromTo("#b-title", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: E }, 38.5);
+          tl.fromTo("#src1", { opacity: 0, y: 70 }, { opacity: 1, y: 0, duration: 0.6, ease: "expo.out" }, 39.9);
+          tl.fromTo("#src2", { opacity: 0, y: 70 }, { opacity: 1, y: 0, duration: 0.6, ease: "expo.out" }, 42.0);
+          tl.fromTo("#src3", { opacity: 0, y: 70 }, { opacity: 1, y: 0, duration: 0.6, ease: "expo.out" }, 43.0);
+          tl.fromTo("#cursor", { opacity: 0, x: 1800, y: 700 }, { opacity: 1, x: 1760, y: 600, duration: 0.6, ease: E, immediateRender: false }, 44.2);
+          tl.to("#cd-btn", { scale: 0.9, duration: 0.07 }, 44.85);
+          tl.to("#cd-btn", { scale: 1, duration: 0.15 }, 44.92);
+          tl.to("#cd-on", { opacity: 1, duration: 0.25 }, 45.0);
+          tl.to(["#app-cd > span", "#cd-btn"], { opacity: 0, duration: 0.2 }, 45.0);
+          tl.fromTo("#toast", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.35, ease: E }, 45.1);
+          tl.to("#cursor", { opacity: 0, duration: 0.2 }, 45.6);
+          tl.to("#s8 > *", { opacity: 0, duration: 0.3 }, 46.2);
+
+          // ---- S9: dev tools ----
+          tl.fromTo("#d-title", { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.5, ease: E }, 46.5);
+          tl.fromTo("#devwin", { opacity: 0, x: 120, rotationY: -12 }, { opacity: 1, x: 0, rotationY: 0, duration: 0.7, ease: "expo.out" }, 46.5);
+          tl.set("#tab1", { opacity: 1 }, 46.6);
+          tl.set("#pd1", { opacity: 1 }, 46.6);
+          tl.set(["#tab1", "#pd1"], { opacity: 0 }, 48.2);
+          tl.set(["#tab2", "#pd2"], { opacity: 1 }, 48.2);
+          tl.fromTo("#hl-tok", { opacity: 0 }, { opacity: 1, duration: 0.2 }, 48.4);
+          tl.to("#hl-tok", { opacity: 0, duration: 0.2 }, 49.2);
+          tl.fromTo("#hl-time", { opacity: 0 }, { opacity: 1, duration: 0.2 }, 49.25);
+          tl.set(["#tab2", "#pd2"], { opacity: 0 }, 49.7);
+          tl.set(["#tab3", "#pd3"], { opacity: 1 }, 49.7);
+          tl.to("#s9 > *", { opacity: 0, duration: 0.25 }, 50.35);
+
+          // ---- S10: no exec ----
+          [["#sl1", 50.7], ["#sl2", 51.4], ["#sl3", 52.1]].forEach(([s, t]) => {
+            tl.fromTo(s, { opacity: 0, scale: 1.4, y: -20 }, { opacity: 1, scale: 1, y: 0, duration: 0.22, ease: "power4.out" }, t);
+          });
+          tl.fromTo("#sec-fine", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 52.4);
+          tl.to("#s10 > *", { opacity: 0, duration: 0.3 }, 53.1);
+
+          // ---- S11: lockup ----
+          tl.fromTo("#tile", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.6, ease: "back.out(1.4)" }, 53.4);
+          tl.fromTo("#wordmark", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.55, ease: "expo.out" }, 54.02); // beat-locked: 54.02
+          tl.fromTo("#deva-block", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.5, ease: E }, 54.3);
+          tl.fromTo("#tagline", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.45, ease: E }, 55.0);
+          tl.fromTo("#url", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.45, ease: E }, 55.7);
+          tl.fromTo("#works", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.45, ease: E }, 56.4);
+
+          // audio-reactive glass glow
+          const A = window.NAKSHA_AUDIO;
+          const bg = document.getElementById("bg");
+          for (let f = 0; f < A.totalFrames; f++) {
+            const prev = A.bass[Math.max(0, f - 1)];
+            const next = A.bass[Math.min(A.totalFrames - 1, f + 1)];
+            tl.set(bg, { "--bass": ((prev + 2 * A.bass[f] + next) / 4).toFixed(3) }, f / A.fps);
+          }
+
+          window.__timelines["main"] = tl;
+        }
+
+        document.fonts.ready.then(build);
+      })();
+    </script>
+  </body>
+</html>

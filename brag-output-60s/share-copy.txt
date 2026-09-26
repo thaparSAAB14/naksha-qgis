@@ -1,0 +1,3 @@
+Naksha (नक्शा, "map"): a free, open-source AI agent for QGIS.
+Say what you need. It plans, runs the real Processing tools, catches its own empty results, and prints the map, on local Ollama, an API key, or the Claude subscription you already have.
+github.com/thaparSAAB14/naksha-qgis
