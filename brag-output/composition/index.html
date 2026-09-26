@@ -1,0 +1,985 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Naksha — brag</title>
+    <script src="assets/vendor/gsap.min.js"></script>
+    <script src="assets/audio-data.js"></script>
+    <style>
+      @font-face {
+        font-family: "Tiro Devanagari Hindi";
+        font-style: normal;
+        font-weight: 400;
+        src: url("assets/fonts/tiro-devanagari-hindi-naksha.woff2") format("woff2");
+      }
+      :root {
+        --bg: #1b2523;
+        --surface: #2b3634;
+        --bubble: #233230;
+        --bubble-mine: #1d2a38;
+        --border: #3a4a47;
+        --accent: #35b8a5;
+        --tile: #10695c;
+        --user: #7fb3e8;
+        --warn: #d08f58;
+        --text: #e6edeb;
+        --muted: #9aa5a3;
+        --sans: "Montserrat", sans-serif;
+        --mono: "IBM Plex Mono", monospace;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--bg);
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        font-family: var(--sans);
+        color: var(--text);
+      }
+
+      /* ---------- background layer ---------- */
+      #bg {
+        position: absolute;
+        inset: 0;
+        --bass: 0;
+      }
+      #contours {
+        position: absolute;
+        left: -120px;
+        top: -120px;
+        width: 2160px;
+        height: 1320px;
+      }
+      #contours path {
+        fill: none;
+        stroke: var(--accent);
+        stroke-width: 2;
+        stroke-opacity: 0.16;
+      }
+      .glow-wrap {
+        position: absolute;
+      }
+      #map-glow-wrap {
+        left: -60px;
+        top: 180px;
+        width: 1380px;
+        height: 960px;
+      }
+      #tile-glow-wrap {
+        left: -50px;
+        top: 142px;
+        width: 700px;
+        height: 700px;
+        opacity: 0;
+      }
+      .glow {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: radial-gradient(closest-side, rgba(53, 184, 165, 0.34), rgba(53, 184, 165, 0) 100%);
+        opacity: calc(0.45 + var(--bass) * 0.55);
+        transform: scale(calc(0.96 + var(--bass) * 0.08));
+      }
+
+      /* ---------- workspace ---------- */
+      #workspace {
+        width: 1920px;
+        height: 1080px;
+      }
+      #ws-inner {
+        position: absolute;
+        inset: 0;
+      }
+
+      #chapter {
+        position: absolute;
+        left: 80px;
+        top: 58px;
+        width: 1110px;
+        height: 214px;
+      }
+      .eyebrow {
+        position: absolute;
+        left: 0;
+        top: 0;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        font-family: var(--mono);
+        font-weight: 700;
+        font-size: 22px;
+        letter-spacing: 0.12em;
+        color: var(--accent);
+        opacity: 0;
+      }
+      .eyebrow i {
+        display: block;
+        width: 56px;
+        height: 3px;
+        background: var(--accent);
+      }
+      .headline {
+        position: absolute;
+        left: 0;
+        top: 44px;
+        width: 1110px;
+        font-weight: 900;
+        font-size: 76px;
+        line-height: 1.04;
+        letter-spacing: -0.03em;
+        color: var(--text);
+        text-wrap: balance;
+        opacity: 0;
+      }
+      .headline em {
+        font-style: normal;
+        color: var(--accent);
+      }
+
+      /* map panel */
+      #map-panel {
+        position: absolute;
+        left: 80px;
+        top: 290px;
+        width: 1110px;
+        height: 730px;
+        border: 2px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+        background: var(--bubble);
+      }
+      #map {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1106px;
+        height: 684px;
+      }
+      #map .terrain path {
+        fill: none;
+        stroke: var(--accent);
+        stroke-width: 2;
+        stroke-opacity: 0.12;
+      }
+      #map .road {
+        fill: none;
+        stroke: var(--border);
+        stroke-width: 5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      #map .highway {
+        fill: none;
+        stroke: var(--muted);
+        stroke-opacity: 0.4;
+        stroke-width: 9;
+        stroke-linecap: round;
+      }
+      #river {
+        fill: none;
+        stroke: var(--user);
+        stroke-opacity: 0.6;
+        stroke-width: 22;
+        stroke-linecap: round;
+      }
+      #flood path {
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .ring {
+        fill: var(--accent);
+        fill-opacity: 0.16;
+        stroke: var(--accent);
+        stroke-width: 3;
+        stroke-opacity: 0.85;
+        opacity: 0;
+      }
+      .pin {
+        fill: var(--text);
+        stroke: var(--bg);
+        stroke-width: 4;
+      }
+      .pulse {
+        fill: none;
+        stroke: var(--warn);
+        stroke-width: 4;
+        opacity: 0;
+      }
+
+      .map-tag {
+        position: absolute;
+        padding: 6px 14px;
+        border-radius: 10px;
+        background: var(--bg);
+        font-family: var(--mono);
+        font-weight: 700;
+        font-size: 19px;
+        white-space: nowrap;
+        opacity: 0;
+      }
+      #tag-bad {
+        left: 812px;
+        top: 206px;
+        color: var(--warn);
+        border: 2px solid var(--warn);
+      }
+      #tag-good {
+        left: 560px;
+        top: 412px;
+        color: var(--accent);
+        border: 2px solid var(--accent);
+      }
+
+      #layers {
+        position: absolute;
+        left: 16px;
+        top: 16px;
+        width: 330px;
+        padding: 12px 16px 10px;
+        border-radius: 12px;
+        border: 2px solid var(--border);
+        background: var(--bg);
+        font-family: var(--mono);
+        font-size: 18px;
+        color: var(--text);
+      }
+      #layers h4 {
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      .lrow {
+        display: flex;
+        align-items: center;
+        height: 30px;
+        gap: 10px;
+      }
+      .lrow b {
+        display: block;
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+        background: var(--accent);
+        flex: none;
+      }
+      .lrow span {
+        flex: 1;
+      }
+      .lrow em {
+        font-style: normal;
+        font-weight: 700;
+        color: var(--muted);
+      }
+      .lrow.late {
+        opacity: 0;
+      }
+      .lrow .num {
+        position: relative;
+        width: 44px;
+        text-align: right;
+      }
+      .lrow .num em {
+        position: absolute;
+        right: 0;
+        top: -13px;
+      }
+      #ext-zero {
+        color: var(--warn);
+      }
+      #ext-four {
+        color: var(--accent);
+        opacity: 0;
+      }
+
+      #statusbar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        background: var(--surface);
+        border-top: 2px solid var(--border);
+        font-family: var(--mono);
+        font-size: 17px;
+        color: var(--muted);
+      }
+      #statusbar strong {
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      /* dock */
+      #dock {
+        position: absolute;
+        left: 1236px;
+        top: 58px;
+        width: 624px;
+        height: 962px;
+        border: 2px solid var(--border);
+        border-radius: 16px;
+        background: var(--surface);
+        padding: 18px 22px 22px;
+      }
+      #dock-head {
+        display: flex;
+        align-items: center;
+        height: 52px;
+        gap: 12px;
+      }
+      .ntile {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        background: var(--tile);
+        color: var(--text);
+        font-weight: 900;
+        font-size: 27px;
+        flex: none;
+      }
+      #dock-name {
+        font-weight: 700;
+        font-size: 26px;
+      }
+      #status {
+        margin-left: auto;
+        padding: 6px 14px;
+        border-radius: 12px;
+        border: 2px solid var(--border);
+        background: var(--bubble);
+        color: var(--accent);
+        font-weight: 700;
+        font-size: 17px;
+        white-space: nowrap;
+      }
+      #gear {
+        font-size: 24px;
+        color: var(--muted);
+        width: 28px;
+        text-align: center;
+      }
+      #transcript {
+        position: relative;
+        margin-top: 14px;
+        height: 772px;
+        border: 2px solid var(--border);
+        border-radius: 14px;
+        overflow: hidden;
+      }
+      .grp {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      #grpB {
+        opacity: 0;
+      }
+      .bubble {
+        position: relative;
+        width: 486px;
+        padding: 12px 18px 14px;
+        border-radius: 14px;
+        border: 2px solid var(--border);
+        border-left: 5px solid var(--accent);
+        background: var(--bubble);
+        font-weight: 500;
+        font-size: 21px;
+        line-height: 1.42;
+        color: var(--text);
+        text-wrap: balance;
+      }
+      .bubble.mine {
+        margin-left: auto;
+        background: var(--bubble-mine);
+        border-left-color: var(--user);
+      }
+      .bubble .who {
+        display: block;
+        font-weight: 700;
+        font-size: 15px;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      .bubble .mono {
+        display: block;
+        font-family: var(--mono);
+        font-size: 19px;
+        line-height: 1.45;
+      }
+      .bubble .mono strong {
+        color: var(--accent);
+      }
+      .bubble .big {
+        display: block;
+        font-weight: 700;
+        font-size: 25px;
+        line-height: 1.3;
+      }
+      .bubble .big strong {
+        font-weight: 900;
+        color: var(--warn);
+      }
+      .bubble .foot {
+        display: block;
+        margin-top: 8px;
+        font-family: var(--mono);
+        font-size: 17px;
+        line-height: 1.45;
+        color: var(--muted);
+      }
+      .late {
+        opacity: 0;
+      }
+      .slot {
+        position: relative;
+      }
+      .chip {
+        position: absolute;
+        left: 14px;
+        top: 4px;
+        font-style: italic;
+        font-weight: 500;
+        font-size: 20px;
+        color: var(--muted);
+        white-space: nowrap;
+        opacity: 0;
+      }
+      .chip.warn {
+        left: 0;
+        top: 0;
+        padding: 8px 14px;
+        border: 2px solid var(--warn);
+        border-radius: 12px;
+        font-style: normal;
+        font-family: var(--mono);
+        font-weight: 700;
+        font-size: 19px;
+        line-height: 1.45;
+        width: 520px;
+        white-space: normal;
+        color: var(--warn);
+      }
+
+      #input-row {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+        height: 64px;
+      }
+      #input {
+        position: relative;
+        flex: 1;
+        border: 2px solid var(--border);
+        border-radius: 14px;
+        background: var(--bg);
+        font-weight: 500;
+        font-size: 21px;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      #ph,
+      #typed {
+        position: absolute;
+        left: 18px;
+        top: 17px;
+      }
+      #ph {
+        color: var(--muted);
+      }
+      #typed span {
+        opacity: 0;
+      }
+      #caret {
+        position: absolute;
+        left: 18px;
+        top: 16px;
+        width: 3px;
+        height: 30px;
+        background: var(--accent);
+        opacity: 0;
+      }
+      #send {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 112px;
+        border-radius: 14px;
+        background: var(--tile);
+        color: var(--text);
+        font-weight: 700;
+        font-size: 21px;
+      }
+
+      /* ---------- outro ---------- */
+      #outro {
+        width: 1920px;
+        height: 1080px;
+      }
+      #tile {
+        position: absolute;
+        left: 200px;
+        top: 392px;
+        width: 200px;
+        height: 200px;
+        border-radius: 34px;
+        background: var(--tile);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        font-size: 150px;
+        color: var(--text);
+        opacity: 0;
+      }
+      #lock-text {
+        position: absolute;
+        left: 452px;
+        top: 372px;
+        width: 1300px;
+      }
+      #wordrow {
+        display: flex;
+        align-items: flex-end;
+        gap: 40px;
+        height: 170px;
+      }
+      #wordmark {
+        display: block;
+        font-weight: 900;
+        font-size: 160px;
+        line-height: 0.95;
+        letter-spacing: -0.04em;
+        opacity: 0;
+      }
+      #deva-block {
+        display: flex;
+        flex-direction: column;
+        padding-bottom: 14px;
+        opacity: 0;
+      }
+      #deva {
+        font-family: "Tiro Devanagari Hindi", serif;
+        font-size: 96px;
+        line-height: 1;
+        color: var(--accent);
+      }
+      #deva-note {
+        margin-top: 4px;
+        font-family: var(--mono);
+        font-size: 22px;
+        color: var(--muted);
+      }
+      #tagline {
+        margin-top: 30px;
+        font-weight: 400;
+        font-size: 50px;
+        letter-spacing: -0.01em;
+        opacity: 0;
+      }
+      #url {
+        margin-top: 22px;
+        font-family: var(--mono);
+        font-size: 26px;
+        color: var(--muted);
+        opacity: 0;
+      }
+      #url strong {
+        color: var(--text);
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="20.5"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- persistent background: contour field + audio-reactive glows -->
+      <div id="bg">
+        <svg id="contours" viewBox="0 0 2160 1320" aria-hidden="true" data-layout-ignore></svg>
+        <div id="map-glow-wrap" class="glow-wrap"><div class="glow"></div></div>
+        <div id="tile-glow-wrap" class="glow-wrap"><div class="glow"></div></div>
+      </div>
+
+      <!-- scenes 1-3: one continuous QGIS workspace -->
+      <section id="workspace" class="clip" data-start="0" data-duration="16.6" data-track-index="1">
+        <div id="ws-inner">
+          <div id="chapter">
+            <div class="eyebrow" id="eb1"><i></i>01 — PLAIN LANGUAGE</div>
+            <div class="eyebrow" id="eb2"><i></i>02 — INSTANT · OFFLINE · NO KEY</div>
+            <div class="eyebrow" id="eb3"><i></i>03 — VERIFIED</div>
+            <h1 class="headline" id="h1">Ask for any GIS job in <em>plain language.</em></h1>
+            <h1 class="headline" id="h2">Some things need <em>no AI</em> at all.</h1>
+            <h1 class="headline" id="h3">Then it <em>checks its own output.</em></h1>
+          </div>
+
+          <div id="map-panel">
+            <svg id="map" viewBox="0 0 1106 684" aria-hidden="true">
+              <defs>
+                <pattern id="hatch" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                  <rect width="18" height="18" fill="#7fb3e8" fill-opacity="0.14"></rect>
+                  <rect width="5" height="18" fill="#7fb3e8" fill-opacity="0.5"></rect>
+                </pattern>
+              </defs>
+              <g class="terrain" id="terrain" data-layout-allow-overflow></g>
+              <path class="road" d="M 0 300 L 400 330 L 700 250 L 1106 300" />
+              <path class="road" d="M 250 0 L 300 250 L 230 684" />
+              <path class="road" d="M 850 0 L 820 300 L 900 684" />
+              <path class="road" d="M 0 600 L 500 640 L 1106 590" />
+              <path class="road" d="M 450 684 L 520 500 L 460 150 L 520 0" />
+              <path class="highway" d="M 0 470 C 250 440, 420 380, 560 420 S 850 520, 1106 470" />
+              <path class="highway" d="M 640 0 C 620 200, 700 420, 640 684" />
+              <path id="river" data-layout-allow-overflow d="M -20 150 C 200 120, 300 330, 520 330 S 800 250, 900 420 S 1050 600, 1130 610" />
+              <g id="flood" opacity="0" data-layout-allow-overflow>
+                <path d="M -20 150 C 200 120, 300 330, 520 330 S 800 250, 900 420 S 1050 600, 1130 610" stroke="url(#hatch)" stroke-width="150" />
+              </g>
+              <g id="rings"></g>
+              <g id="pulses"></g>
+              <g id="pins"></g>
+            </svg>
+
+            <div class="map-tag" id="tag-bad">flood_zones · EPSG:4326</div>
+            <div class="map-tag" id="tag-good">flood_zones · EPSG:32643</div>
+
+            <div id="layers">
+              <h4>LAYERS</h4>
+              <div class="lrow"><b></b><span>schools</span><div class="num"><em>14</em></div></div>
+              <div class="lrow"><b></b><span>roads</span><div class="num"></div></div>
+              <div class="lrow late" id="lr-buffer"><b></b><span>buffer_output</span><div class="num"><em>14</em></div></div>
+              <div class="lrow late" id="lr-flood"><b></b><span>flood_zones</span><div class="num"></div></div>
+              <div class="lrow late" id="lr-extract">
+                <b></b><span>extract_output</span>
+                <div class="num"><em id="ext-zero">0</em><em id="ext-four">4</em></div>
+              </div>
+            </div>
+
+            <div id="statusbar">
+              <span>Scale 1:25,000</span>
+              <span>CRS <strong>EPSG:32643</strong></span>
+            </div>
+          </div>
+
+          <aside id="dock">
+            <div id="dock-head">
+              <div class="ntile">N</div>
+              <div id="dock-name">Naksha</div>
+              <div id="status">● Ollama (local, free) · qwen2.5:7b</div>
+              <div id="gear">⚙</div>
+            </div>
+
+            <div id="transcript">
+              <div class="grp" id="grpA">
+                <div class="bubble" id="greet">
+                  <span class="who">NAKSHA</span>
+                  Namaste! Tell me what you need and I'll do the GIS work — I check my own results, and nothing is written without your OK.
+                </div>
+                <div class="bubble mine late" id="youA">
+                  <span class="who">YOU</span>
+                  buffer schools by 500 m
+                </div>
+                <div class="slot">
+                  <div class="chip" id="chipA">· running native:buffer…</div>
+                  <div class="bubble late" id="ansA">
+                    <span class="who">NAKSHA</span>
+                    <span class="mono">native:buffer finished:</span>
+                    <span class="mono">OUTPUT: layer 'buffer_output' added — <strong>14 features</strong>, CRS <strong>EPSG:32643</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grp" id="grpB">
+                <div class="bubble mine late" id="youB">
+                  <span class="who">YOU</span>
+                  find flood-exposed schools and map them
+                </div>
+                <div class="slot">
+                  <div class="chip" id="chipB1">· running native:extractbylocation…</div>
+                  <div class="chip warn" id="chipB2">WARNING: 0 features — verify inputs (CRS mismatch? wrong filter?)</div>
+                  <div class="chip" id="chipB3">· running native:reprojectlayer…</div>
+                  <div class="chip" id="chipB4">· re-running native:extractbylocation…</div>
+                  <div class="bubble late" id="ansB">
+                    <span class="who">NAKSHA</span>
+                    <span class="big"><strong>4 of 14</strong> schools are in the flood zone.</span>
+                    <span class="foot">1st pass: 0 features (CRS mismatch). Reprojected flood_zones to EPSG:32643 and re-ran.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="input-row">
+              <div id="input">
+                <span id="ph">Ask for any GIS job in plain language…</span>
+                <span id="typed"></span>
+                <span id="caret"></span>
+              </div>
+              <div id="send">Send</div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- scene 4: lockup -->
+      <section id="outro" class="clip" data-start="15.84" data-duration="4.66" data-track-index="2">
+        <div id="tile">N</div>
+        <div id="lock-text">
+          <div id="wordrow">
+            <div id="wordmark">Naksha</div>
+            <div id="deva-block">
+              <div id="deva">नक्शा</div>
+              <div id="deva-note">Hindi for “map”</div>
+            </div>
+          </div>
+          <div id="tagline">Free, open-source AI agent for QGIS.</div>
+          <div id="url"><strong>github.com/thaparSAAB14/naksha-qgis</strong> · GPL-2.0 · QGIS 3.40+</div>
+        </div>
+      </section>
+
+      <!-- music bed -->
+      <audio
+        id="bg-music"
+        src="assets/music/happy-beats-business-moves-vol-12-by-ende-dot-app.mp3"
+        data-start="0"
+        data-duration="20.5"
+        data-track-index="10"
+        data-volume="0.32"
+        data-automation='{"version":1,"lanes":[{"target":"volume","points":[{"t":0,"v":1},{"t":19.3,"v":1},{"t":20.5,"v":0}]}]}'
+      ></audio>
+
+      <!-- typing: a tick on every other character -->
+      <audio id="key-01" src="assets/sfx/keyboard/keypress-001.wav" data-start="1.100" data-duration="0.25" data-track-index="11" data-volume="0.35"></audio>
+      <audio id="key-02" src="assets/sfx/keyboard/keypress-005.wav" data-start="1.212" data-duration="0.25" data-track-index="12" data-volume="0.3"></audio>
+      <audio id="key-03" src="assets/sfx/keyboard/keypress-009.wav" data-start="1.324" data-duration="0.25" data-track-index="13" data-volume="0.35"></audio>
+      <audio id="key-04" src="assets/sfx/keyboard/keypress-003.wav" data-start="1.436" data-duration="0.25" data-track-index="11" data-volume="0.3"></audio>
+      <audio id="key-05" src="assets/sfx/keyboard/keypress-012.wav" data-start="1.548" data-duration="0.25" data-track-index="12" data-volume="0.35"></audio>
+      <audio id="key-06" src="assets/sfx/keyboard/keypress-007.wav" data-start="1.660" data-duration="0.25" data-track-index="13" data-volume="0.3"></audio>
+      <audio id="key-07" src="assets/sfx/keyboard/keypress-015.wav" data-start="1.772" data-duration="0.25" data-track-index="11" data-volume="0.35"></audio>
+      <audio id="key-08" src="assets/sfx/keyboard/keypress-001.wav" data-start="1.884" data-duration="0.25" data-track-index="12" data-volume="0.3"></audio>
+      <audio id="key-09" src="assets/sfx/keyboard/keypress-018.wav" data-start="1.996" data-duration="0.25" data-track-index="13" data-volume="0.35"></audio>
+      <audio id="key-10" src="assets/sfx/keyboard/keypress-009.wav" data-start="2.108" data-duration="0.25" data-track-index="11" data-volume="0.3"></audio>
+      <audio id="key-11" src="assets/sfx/keyboard/keypress-005.wav" data-start="2.220" data-duration="0.25" data-track-index="12" data-volume="0.35"></audio>
+      <audio id="key-12" src="assets/sfx/keyboard/keypress-012.wav" data-start="2.332" data-duration="0.25" data-track-index="13" data-volume="0.3"></audio>
+
+      <!-- motion-matched accents -->
+      <audio id="sfx-send-a" src="assets/sfx/interface/ui-click2.ogg" data-start="2.72" data-duration="0.08" data-track-index="14" data-volume="0.7"></audio>
+      <audio id="sfx-rings" src="assets/sfx/interface/drop_001.ogg" data-start="4.37" data-duration="0.12" data-track-index="14" data-volume="0.6"></audio>
+      <audio id="sfx-send-b" src="assets/sfx/interface/ui-click2.ogg" data-start="8.72" data-duration="0.08" data-track-index="14" data-volume="0.6"></audio>
+      <audio id="sfx-warn" src="assets/sfx/impact/impactSoft_medium_002.ogg" data-start="10.36" data-duration="0.14" data-track-index="14" data-volume="0.7"></audio>
+      <audio id="sfx-snap" src="assets/sfx/impact/impactSoft_medium_001.ogg" data-start="12.36" data-duration="0.19" data-track-index="14" data-volume="0.65"></audio>
+      <audio id="sfx-payoff" src="assets/sfx/interface/bong_001.ogg" data-start="13.10" data-duration="0.13" data-track-index="14" data-volume="0.75"></audio>
+      <audio id="sfx-logo" src="assets/sfx/impact/impactBell_heavy_000.ogg" data-start="17.45" data-duration="1.48" data-track-index="15" data-volume="0.4"></audio>
+    </div>
+
+    <script>
+      (function () {
+        const NS = "http://www.w3.org/2000/svg";
+        const el = (tag, attrs, parent) => {
+          const node = document.createElementNS(NS, tag);
+          for (const k in attrs) node.setAttribute(k, attrs[k]);
+          parent.appendChild(node);
+          return node;
+        };
+
+        // Deterministic contour rings: sine wobble, no randomness.
+        function ring(cx, cy, r, k, ax, ay) {
+          const pts = [];
+          for (let i = 0; i <= 96; i++) {
+            const t = (i / 96) * Math.PI * 2;
+            const w = 1 + 0.07 * Math.sin(3 * t + k * 0.7) + 0.04 * Math.sin(5 * t + k * 1.3);
+            pts.push((cx + Math.cos(t) * r * w * ax).toFixed(1) + " " + (cy + Math.sin(t) * r * w * ay).toFixed(1));
+          }
+          return "M " + pts.join(" L ") + " Z";
+        }
+        const contours = document.getElementById("contours");
+        for (let k = 1; k <= 11; k++) el("path", { d: ring(1640, 1020, 95 * k, k, 1.25, 0.9) }, contours);
+        for (let k = 1; k <= 7; k++) el("path", { d: ring(260, 180, 85 * k, k + 4, 1.1, 0.8) }, contours);
+        const terrain = document.getElementById("terrain");
+        for (let k = 1; k <= 6; k++) el("path", { d: ring(560, 560, 70 * k, k, 1.3, 0.7) }, terrain);
+        for (let k = 1; k <= 4; k++) el("path", { d: ring(980, 120, 60 * k, k + 2, 1.2, 0.8) }, terrain);
+
+        // Schools: the first four sit inside the flood zone.
+        const schools = [
+          [250, 270], [520, 300], [770, 350], [1000, 530],
+          [130, 420], [330, 520], [180, 610], [600, 560], [420, 90],
+          [620, 110], [740, 190], [820, 620], [1040, 330], [930, 630],
+        ];
+        const rings = document.getElementById("rings");
+        const pulses = document.getElementById("pulses");
+        const pins = document.getElementById("pins");
+        schools.forEach(([x, y], i) => {
+          el("circle", { class: "ring", id: "ring-" + i, cx: x, cy: y, r: 46 }, rings);
+          if (i < 4) el("circle", { class: "pulse", id: "pulse-" + i, cx: x, cy: y, r: 14 }, pulses);
+          el("circle", { class: "pin" + (i < 4 ? " exposed" : ""), cx: x, cy: y, r: 10 }, pins);
+        });
+
+        // Typed command: one span per character.
+        const command = "buffer schools by 500 m";
+        const typed = document.getElementById("typed");
+        for (const ch of command) {
+          const s = document.createElement("span");
+          s.textContent = ch === " " ? " " : ch;
+          typed.appendChild(s);
+        }
+
+        function build() {
+          const tl = gsap.timeline({ paused: true });
+          const typedLeft = typed.offsetLeft;
+          const charEnds = Array.from(typed.children).map((s) => typedLeft + s.offsetLeft + s.offsetWidth);
+
+          // ambient drift on the contour field
+          tl.fromTo("#contours", { x: 0, rotation: 0 }, { x: -60, rotation: 1.2, duration: 20.5, ease: "none" }, 0);
+
+          // ---- Scene 1: plain language (0 - 3.82) ----
+          tl.fromTo("#map-panel", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0);
+          tl.fromTo("#dock", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.55, ease: "power3.out" }, 0.05);
+          tl.fromTo("#eb1", { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 0.25);
+          tl.fromTo("#h1", { opacity: 0, y: 34 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, 0.3);
+
+          // caret idles, then follows the typing
+          tl.set("#caret", { opacity: 1, x: 0 }, 0.5);
+          tl.set("#caret", { opacity: 0 }, 0.8);
+          tl.set("#ph", { opacity: 0 }, 1.08);
+          tl.set("#caret", { opacity: 1 }, 1.08);
+          const t0 = 1.1;
+          const step = 0.056;
+          Array.from(typed.children).forEach((s, i) => {
+            const at = t0 + i * step;
+            tl.set(s, { opacity: 1 }, at);
+            tl.set("#caret", { x: charEnds[i] - 16 }, at);
+          });
+
+          // Send press on the beat (2.73)
+          tl.to("#send", { scale: 0.93, duration: 0.08, ease: "power2.in" }, 2.66);
+          tl.to("#send", { scale: 1, duration: 0.2, ease: "power2.out" }, 2.74);
+          tl.set("#typed", { opacity: 0 }, 2.8);
+          tl.set("#caret", { opacity: 0, x: 0 }, 2.8);
+          tl.set("#ph", { opacity: 1 }, 2.8);
+          tl.fromTo("#youA", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.35, ease: "power3.out" }, 2.8);
+          tl.to("#chipA", { opacity: 1, duration: 0.25 }, 3.3);
+
+          // ---- Scene 2: no AI needed (3.82 - 8.19) ----
+          tl.to("#eb1", { opacity: 0, duration: 0.25 }, 3.62);
+          tl.to("#h1", { opacity: 0, y: -24, duration: 0.3, ease: "power2.in" }, 3.6);
+          tl.fromTo("#eb2", { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 3.82);
+          tl.fromTo("#h2", { opacity: 0, y: 34 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, 3.82);
+
+          // beat-grid: ring wave 4.39 -> 5.34 (non-text accent), left to right
+          const order = schools.map((p, i) => [p[0], i]).sort((a, b) => a[0] - b[0]).map((p) => p[1]);
+          order.forEach((i, n) => {
+            const at = 4.39 + n * (0.95 / (order.length - 1));
+            tl.fromTo("#ring-" + i, { opacity: 0, scale: 0.2, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.6)" }, at);
+          });
+
+          // beat-grid: answer lands on 6.00
+          tl.to("#chipA", { opacity: 0, duration: 0.15 }, 5.9);
+          tl.fromTo("#ansA", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" }, 6.0);
+          tl.fromTo("#lr-buffer", { opacity: 0, x: -14 }, { opacity: 1, x: 0, duration: 0.35, ease: "power2.out" }, 6.0);
+
+          // ---- Scene 3: it checks its own output (8.19 - 15.84) ----
+          tl.to("#eb2", { opacity: 0, duration: 0.25 }, 7.97);
+          tl.to("#h2", { opacity: 0, y: -24, duration: 0.3, ease: "power2.in" }, 7.95);
+          tl.fromTo("#eb3", { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 8.19);
+          tl.fromTo("#h3", { opacity: 0, y: 34 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, 8.19);
+
+          // transcript scrolls to the new exchange
+          tl.to("#grpA", { y: -90, opacity: 0, duration: 0.45, ease: "power2.inOut" }, 8.19);
+          tl.set("#grpB", { opacity: 1 }, 8.5);
+          tl.fromTo("#youB", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.35, ease: "power3.out" }, 8.74);
+
+          // flood_zones arrives in the wrong CRS: tiny and off to the corner
+          tl.set("#flood", { x: 790, y: 18, scale: 0.26, svgOrigin: "0 0" }, 0);
+          tl.to("#flood", { opacity: 1, duration: 0.5, ease: "power2.out" }, 9.29);
+          tl.fromTo("#tag-bad", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }, 9.4);
+          tl.fromTo("#lr-flood", { opacity: 0, x: -14 }, { opacity: 1, x: 0, duration: 0.35, ease: "power2.out" }, 9.29);
+
+          tl.to("#chipB1", { opacity: 1, duration: 0.25 }, 9.83);
+          // 0 features: flagged, not reported as success
+          tl.to("#chipB1", { opacity: 0, duration: 0.15 }, 10.27);
+          tl.fromTo("#chipB2", { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.3, ease: "power3.out" }, 10.37);
+          tl.fromTo("#lr-extract", { opacity: 0, x: -14 }, { opacity: 1, x: 0, duration: 0.35, ease: "power2.out" }, 10.37);
+
+          // reproject: the layer glides onto the river
+          tl.to("#chipB2", { opacity: 0, duration: 0.2 }, 11.36);
+          tl.to("#chipB3", { opacity: 1, duration: 0.25 }, 11.46);
+          tl.to("#tag-bad", { opacity: 0, duration: 0.2 }, 11.46);
+          tl.to("#flood", { x: 0, y: 0, scale: 1, duration: 0.92, ease: "power3.inOut" }, 11.46);
+          tl.fromTo("#tag-good", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }, 12.4);
+
+          tl.to("#chipB3", { opacity: 0, duration: 0.15 }, 12.45);
+          tl.to("#chipB4", { opacity: 1, duration: 0.25 }, 12.55);
+
+          // beat-locked: 13.11 payoff
+          tl.to("#chipB4", { opacity: 0, duration: 0.15 }, 12.98);
+          tl.fromTo("#ansB", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" }, 13.11);
+          tl.to(".pin.exposed", { fill: "#d08f58", duration: 0.3, ease: "power2.out" }, 13.11);
+          for (let i = 0; i < 4; i++) {
+            tl.fromTo(
+              "#pulse-" + i,
+              { opacity: 0.95, scale: 1, transformOrigin: "50% 50%" },
+              { opacity: 0, scale: 2.8, duration: 1.1, ease: "power2.out", immediateRender: false },
+              13.11,
+            );
+          }
+          tl.to("#ext-zero", { opacity: 0, duration: 0.15 }, 13.11);
+          tl.to("#ext-four", { opacity: 1, duration: 0.25 }, 13.15);
+
+          // ---- Scene 4: outro (15.84 - 20.5) ----
+          tl.to("#ws-inner", { opacity: 0, scale: 0.96, duration: 0.7, ease: "power2.inOut" }, 15.9);
+          tl.to("#map-glow-wrap", { opacity: 0, duration: 0.7 }, 15.9);
+          tl.to("#tile-glow-wrap", { opacity: 1, duration: 0.8 }, 16.3);
+          tl.fromTo("#tile", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.6, ease: "back.out(1.4)" }, 16.38);
+          // beat-locked: 17.47 wordmark
+          tl.fromTo("#wordmark", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.55, ease: "expo.out" }, 17.47);
+          tl.fromTo("#deva-block", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 17.62);
+          tl.fromTo("#tagline", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 18.02);
+          tl.fromTo("#url", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 18.56);
+
+          // audio-reactive: bass drives the glows, one sample per frame
+          const A = window.NAKSHA_AUDIO;
+          const bg = document.getElementById("bg");
+          for (let f = 0; f < A.totalFrames; f++) {
+            const prev = A.bass[Math.max(0, f - 1)];
+            const next = A.bass[Math.min(A.totalFrames - 1, f + 1)];
+            const v = (prev + 2 * A.bass[f] + next) / 4;
+            tl.set(bg, { "--bass": v.toFixed(3) }, f / A.fps);
+          }
+
+          window.__timelines["main"] = tl;
+        }
+
+        document.fonts.ready.then(build);
+      })();
+    </script>
+  </body>
+</html>

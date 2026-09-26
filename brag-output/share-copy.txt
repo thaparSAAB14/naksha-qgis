@@ -1,0 +1,3 @@
+Introducing Naksha (नक्शा, Hindi for "map"): a free, open-source AI agent for QGIS.
+Ask for any GIS job in plain language. It runs the real Processing tools, checks its own output, and reports numbers, never a bare "done".
+github.com/thaparSAAB14/naksha-qgis
